@@ -1,0 +1,62 @@
+{
+    "table":
+    {
+        "highest_point_from_pile":
+        {
+            "id": 10,
+            "name": "Highest score from taking a pile",
+            "type": "int"
+        },
+        "lowest_point_from_pile":
+        {
+            "id": 11,
+            "name": "Lowest score from taking a pile",
+            "type": "int"
+        },
+        "max_card_on_a_pile":
+        {
+            "id": 12,
+            "name": "Highest number of cards in a pile",
+            "type": "int"
+        }
+    },
+    "player":
+    {
+        "highest_point_from_pile":
+        {
+            "id": 10,
+            "name": "Highest score from taking a pile",
+            "type": "int"
+        },
+        "lowest_point_from_pile":
+        {
+            "id": 11,
+            "name": "Lowest score from taking a pile",
+            "type": "int"
+        },
+        "cards_taken":
+        {
+            "id": 12,
+            "name": "Number of cards taken",
+            "type": "int"
+        },
+        "piles_taken":
+        {
+            "id": 13,
+            "name": "Number of piles taken",
+            "type": "int"
+        },
+        "avg_ranking_revealed_cards":
+        {
+            "id": 14,
+            "name": "Average ranking among revealed cards",
+            "type": "float"
+        },
+        "avg_ranking_revealed_cards_divide_num_players":
+        {
+            "id": 15,
+            "name": "Average ranking among revealed cards / Number of players",
+            "type": "float"
+        }
+    }
+}
