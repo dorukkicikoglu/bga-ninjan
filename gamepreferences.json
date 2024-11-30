@@ -1,0 +1,52 @@
+{
+    "100":
+    {
+        "name": "Auto-take best pile",
+        "values":
+        {
+            "1":
+            {
+                "name": "On"
+            },
+            "2":
+            {
+                "name": "Off"
+            }
+        },
+        "default": 2
+    },
+    "101":
+    {
+        "name": "Card Pre-selection",
+        "values":
+        {
+            "1":
+            {
+                "name": "On"
+            },
+            "2":
+            {
+                "name": "Off"
+            }
+        },
+        "default": 2
+    },
+    "110":
+    {
+        "name": "Flying characters",
+        "values":
+        {
+            "1":
+            {
+                "name": "On",
+                "cssPref": "flying-characters-on"
+            },
+            "2":
+            {
+                "name": "Off",
+                "cssPref": "flying-characters-off"
+            }
+        },
+        "default": 1
+    }
+}
