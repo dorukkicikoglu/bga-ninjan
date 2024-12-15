@@ -1,0 +1,13 @@
+{
+    "rootDir": ".", 
+    "compilerOptions": {
+      "target": "es5",
+      "module": "none",
+      "lib": ["dom", "esnext"],  
+      "sourceMap": false,
+      "typeRoots": ["src/types", "./types", "./node_modules/@types"],
+      "outFile": "ninjan.js",
+    }, 
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules", "**/*.spec.ts"]
+}
