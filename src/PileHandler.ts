@@ -80,7 +80,7 @@ class PileHandler{
         this.pileClicked(pileContainer);  
     }
 
-    private pileClicked(pile: HTMLDivElement){ this.gameui.ajaxcallwrapper('actTakePile', {pileIndex: dojo.attr(pile, 'pile-index')}); }
+    private pileClicked(pile: HTMLDivElement){ this.gameui.ajaxAction('actTakePile', {pileIndex: dojo.attr(pile, 'pile-index')}); }
 
     public onLeavingStateTakePiles(): void {
         if(this.pileQueueData.length > 0) 

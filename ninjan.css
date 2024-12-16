@@ -20,6 +20,7 @@ body.mobile_version {
   --place-under-arrow-color: #2a119a;
   --place-under-log-color: #4040f5;
   --bg-gradient: linear-gradient(130deg, #ffcae7e0, #ffd6a5fa);
+  --bg-gradient-light: linear-gradient(130deg, #ffcae754, #ffd6a5ba);
   --bg-gradient-dark: linear-gradient(130deg, #ffcae7, #ffd6a5);
   --bg-gradient-tooltip: linear-gradient(100deg, #ffcae7f7, #ffd6a5fa);
 }
@@ -649,8 +650,8 @@ body:not(.current_player_is_active) .gamestate_takePile .my-hand-container .a-ca
 }
 .background-container .bg-rock {
   position: absolute;
-  left: 3.3vw;
-  bottom: 4.8vh;
+  left: 5.3vw;
+  bottom: 8.8vh;
   width: calc(var(--char-width) * 1.9);
   height: calc(var(--char-width) * 2.27);
 }
@@ -685,6 +686,29 @@ body:not(.current_player_is_active) .gamestate_takePile .my-hand-container .a-ca
   background-repeat: no-repeat;
   animation: breathing-scissors 4s ease-in-out infinite;
 }
+.background-container .bg-ref-card {
+  opacity: 0;
+  transition: opacity 0.2s;
+  position: absolute;
+  bottom: 0.9vh;
+  left: 1.3vw;
+  width: calc(var(--char-width)*0.95);
+  height: calc(var(--char-width)*0.95);
+  border-radius: 100%;
+  background: var(--bg-gradient-light);
+}
+.background-container .bg-ref-card:before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: url(img/ref_card.png);
+  background-size: 100%;
+  background-repeat: no-repeat;
+  top: 7%;
+  left: 2%;
+  opacity: 0.9;
+}
 .mobile_version .background-container {
   --char-width: 9.2vh;
   background-size: 200%;
@@ -718,6 +742,9 @@ body:not(.current_player_is_active) .gamestate_takePile .my-hand-container .a-ca
 }
 .mobile_version .chatwindowavatar {
   left: -8px;
+}
+.current_player_is_active .bg-ref-card {
+  opacity: 1;
 }
 .dijitTooltipContainer:has(.tooltip-wrapper) {
   background: none;

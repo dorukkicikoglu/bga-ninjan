@@ -19,7 +19,7 @@ class GameBody extends GameGui {
     public readonly jstpl_card_icon ='<div class="a-card-icon" suit="${suit}" rank="${rank}" card-id="${card_id}"></div>';
     public readonly jstpl_pile_container ='<div class="a-pile-container" pile-index="${pileIndex}"><i class="place-under-icon fa6 fa-share"></i></div>';
     public readonly jstpl_queue_card ='<div class="a-queue-card-container"><div class="player-name-text">${playerName}</div></div>';
-    public readonly jstpl_background_container ='<div class="background-container"><div class="bg-front"></div><div class="bg-paper"></div><div class="bg-rock bg-breathing"></div><div class="bg-front bg-front-transparent"></div><div class="bg-scissors"></div></div>';
+    public readonly jstpl_background_container ='<div class="background-container"><div class="bg-front"></div><div class="bg-paper"></div><div class="bg-rock bg-breathing"></div><div class="bg-front bg-front-transparent"></div><div class="bg-ref-card"></div><div class="bg-scissors"></div></div>';
     public readonly jstpl_tooltip_wrapper ='<div class="tooltip-wrapper"><div class="tooltip-title">${tooltip_title}</div><div class="suits-container">${suit_rows}</div></div>';
 
     constructor() {
@@ -270,7 +270,7 @@ class GameBody extends GameGui {
             }).play();
         }, 3000);
     }
-    public ajaxcallwrapper(action: string, args: Record<string, any> = {}, lock: boolean = true, checkAction: boolean = true): void{
+    public ajaxAction(action: string, args: Record<string, any> = {}, lock: boolean = true, checkAction: boolean = true): void{
         args.version = this.gamedatas.version;
         this.bgaPerformAction(action, args, { lock: lock, checkAction: checkAction });
     }

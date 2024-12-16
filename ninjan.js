@@ -196,7 +196,7 @@ var GameBody = /** @class */ (function (_super) {
         _this.jstpl_card_icon = '<div class="a-card-icon" suit="${suit}" rank="${rank}" card-id="${card_id}"></div>';
         _this.jstpl_pile_container = '<div class="a-pile-container" pile-index="${pileIndex}"><i class="place-under-icon fa6 fa-share"></i></div>';
         _this.jstpl_queue_card = '<div class="a-queue-card-container"><div class="player-name-text">${playerName}</div></div>';
-        _this.jstpl_background_container = '<div class="background-container"><div class="bg-front"></div><div class="bg-paper"></div><div class="bg-rock bg-breathing"></div><div class="bg-front bg-front-transparent"></div><div class="bg-scissors"></div></div>';
+        _this.jstpl_background_container = '<div class="background-container"><div class="bg-front"></div><div class="bg-paper"></div><div class="bg-rock bg-breathing"></div><div class="bg-front bg-front-transparent"></div><div class="bg-ref-card"></div><div class="bg-scissors"></div></div>';
         _this.jstpl_tooltip_wrapper = '<div class="tooltip-wrapper"><div class="tooltip-title">${tooltip_title}</div><div class="suits-container">${suit_rows}</div></div>';
         console.log('ninjan constructor');
         return _this;
@@ -407,7 +407,7 @@ var GameBody = /** @class */ (function (_super) {
             }).play();
         }, 3000);
     };
-    GameBody.prototype.ajaxcallwrapper = function (action, args, lock, checkAction) {
+    GameBody.prototype.ajaxAction = function (action, args, lock, checkAction) {
         if (args === void 0) { args = {}; }
         if (lock === void 0) { lock = true; }
         if (checkAction === void 0) { checkAction = true; }
@@ -541,6 +541,7 @@ var HandHandler = /** @class */ (function () {
         this.handData = handData;
         this.sortCardsBy = sortCardsBy;
         this.selectedCardID = selectedCardID;
+        this.confirmButtonDisabled = true;
         this.handContainer = dojo.query('#game_play_area .my-hand-container')[0];
         this.cardsContainer = dojo.query('.cards-container', this.handContainer)[0];
         this.orderCardsButton = dojo.query('.order-cards-button', this.handContainer)[0];
@@ -566,7 +567,7 @@ var HandHandler = /** @class */ (function () {
     };
     HandHandler.prototype.orderCardsButtonClicked = function () {
         this.sortCardsBy = (this.sortCardsBy == 'suit' ? 'rank' : 'suit');
-        this.gameui.ajaxcallwrapper('setSortCardsBy', { isSuit: this.sortCardsBy == 'suit' }, false, false);
+        this.gameui.ajaxAction('setSortCardsBy', { isSuit: this.sortCardsBy == 'suit' }, false, false);
         this.reorderCards(true);
     };
     HandHandler.prototype.reorderCards = function (doAnimate) {
@@ -675,15 +676,20 @@ var HandHandler = /** @class */ (function () {
             dojo.attr(cardDiv, 'selected', 'true');
         }
         if (this.gameui.gamedatas.gamestate.name == 'selectCard') {
-            if (!this.gameui.isCurrentPlayerActive())
-                this.gameui.ajaxcallwrapper('actRevertCardSelection', {}, true, false);
-            this.updateStatusTextUponCardSelection();
+            if (!this.gameui.isCurrentPlayerActive() && (!this.confirmButtonDisabled || cardWasSelected))
+                this.gameui.ajaxAction('actRevertCardSelection', {}, true, false);
+            if (this.confirmButtonDisabled) {
+                if (!cardWasSelected)
+                    this.gameui.ajaxAction('actSelectCard', { cardID: cardID }, true, false);
+            }
+            else
+                this.updateStatusTextUponCardSelection();
         }
         else if (this.gameui.gamedatas.gamestate.name == 'takePile') { //pre-selection
             if (cardWasSelected)
-                this.gameui.ajaxcallwrapper('actRevertCardSelectionPreSelection', {}, true, false);
+                this.gameui.ajaxAction('actRevertCardSelectionPreSelection', {}, true, false);
             else
-                this.gameui.ajaxcallwrapper('actSelectCardPreSelection', { cardID: cardID }, false, false);
+                this.gameui.ajaxAction('actSelectCardPreSelection', { cardID: cardID }, false, false);
         }
     };
     HandHandler.prototype.setConfirmedSelectedCardID = function (selectedCardIDIn) {
@@ -744,7 +750,7 @@ var HandHandler = /** @class */ (function () {
             return;
         selectedCard = selectedCard[0];
         var cardID = parseInt(dojo.attr(selectedCard, 'card-id'));
-        this.gameui.ajaxcallwrapper('actSelectCard', { cardID: cardID });
+        this.gameui.ajaxAction('actSelectCard', { cardID: cardID });
     };
     HandHandler.prototype.removeCardsFromHandData = function (removedCardsData) {
         if (!Array.isArray(removedCardsData))
@@ -931,7 +937,7 @@ var PileHandler = /** @class */ (function () {
             return;
         this.pileClicked(pileContainer);
     };
-    PileHandler.prototype.pileClicked = function (pile) { this.gameui.ajaxcallwrapper('actTakePile', { pileIndex: dojo.attr(pile, 'pile-index') }); };
+    PileHandler.prototype.pileClicked = function (pile) { this.gameui.ajaxAction('actTakePile', { pileIndex: dojo.attr(pile, 'pile-index') }); };
     PileHandler.prototype.onLeavingStateTakePiles = function () {
         if (this.pileQueueData.length > 0)
             return;
@@ -1254,7 +1260,7 @@ var PrefHandler = /** @class */ (function () {
             case 101:
                 if (parseInt(prefValue) == 2 && this.gameui.gamedatas.gamestate.name != 'selectCard' && this.gameui.myself && this.gameui.myself.hand.selectedCardID) { //revert card selection
                     if (this.gameui.myself && dojo.query('.a-card[selected=true]', this.gameui.myself.hand.handContainer).length > 0)
-                        this.gameui.ajaxcallwrapper('actRevertCardSelectionPreSelection', {}, true, false);
+                        this.gameui.ajaxAction('actRevertCardSelectionPreSelection', {}, true, false);
                     dojo.query('.a-card', this.gameui.myself.hand.handContainer).attr('selected', 'false');
                 }
                 break;

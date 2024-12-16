@@ -62,11 +62,8 @@ class Ninjan extends Table
     
     public function actSelectCard($cardID, $autoPlay_playerID = false, $preSelection = false): void
     {
-        if(!$autoPlay_playerID){
-            if(!$preSelection)
-                $this->checkAction('actSelectCard');
-            else $this->gamestate->checkPossibleAction('actSelectCardPreSelection');
-        }
+        if(!$autoPlay_playerID)
+            $this->gamestate->checkPossibleAction(!$preSelection ? 'actSelectCard' : 'actSelectCardPreSelection');
 
         $currentPlayerID = $autoPlay_playerID ? $autoPlay_playerID : (int) $this->getCurrentPlayerId();
 

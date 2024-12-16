@@ -3,6 +3,7 @@ class HandHandler{
     public handContainer: HTMLDivElement;
     private cardsContainer: HTMLDivElement;
     private orderCardsButton: HTMLDivElement;
+    private confirmButtonDisabled: true = true;
 
     constructor(private gameui: GameBody, private owner: PlayerHandler, private handData: CardData[], private sortCardsBy: 'rank' | 'suit', public selectedCardID: number | false) {
         this.handContainer = dojo.query('#game_play_area .my-hand-container')[0];
@@ -36,7 +37,7 @@ class HandHandler{
 
     private orderCardsButtonClicked(): void{
         this.sortCardsBy = (this.sortCardsBy == 'suit' ? 'rank' : 'suit');
-        this.gameui.ajaxcallwrapper('setSortCardsBy', {isSuit: this.sortCardsBy == 'suit'}, false, false);
+        this.gameui.ajaxAction('setSortCardsBy', {isSuit: this.sortCardsBy == 'suit'}, false, false);
         this.reorderCards(true);
     }
 
@@ -169,14 +170,17 @@ class HandHandler{
         }
 
         if(this.gameui.gamedatas.gamestate.name == 'selectCard'){
-            if(!this.gameui.isCurrentPlayerActive())
-                this.gameui.ajaxcallwrapper('actRevertCardSelection', {}, true, false);
+            if(!this.gameui.isCurrentPlayerActive() && (!this.confirmButtonDisabled || cardWasSelected))
+                this.gameui.ajaxAction('actRevertCardSelection', {}, true, false);
 
-            this.updateStatusTextUponCardSelection();
+            if(this.confirmButtonDisabled){
+                if(!cardWasSelected)
+                    this.gameui.ajaxAction('actSelectCard', {cardID: cardID}, true, false);
+            } else this.updateStatusTextUponCardSelection();
         } else if(this.gameui.gamedatas.gamestate.name == 'takePile') { //pre-selection
             if(cardWasSelected)
-                this.gameui.ajaxcallwrapper('actRevertCardSelectionPreSelection', {}, true, false);
-            else this.gameui.ajaxcallwrapper('actSelectCardPreSelection', {cardID: cardID}, false, false);
+                this.gameui.ajaxAction('actRevertCardSelectionPreSelection', {}, true, false);
+            else this.gameui.ajaxAction('actSelectCardPreSelection', {cardID: cardID}, false, false);
         }
     }
 
@@ -252,7 +256,7 @@ class HandHandler{
 
         selectedCard = selectedCard[0];
         let cardID = parseInt(dojo.attr(selectedCard, 'card-id'));
-        this.gameui.ajaxcallwrapper('actSelectCard', {cardID: cardID});
+        this.gameui.ajaxAction('actSelectCard', {cardID: cardID});
     }
 
     public removeCardsFromHandData(removedCardsData){
