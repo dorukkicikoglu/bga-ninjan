@@ -107,12 +107,13 @@ body.mobile_version{ background-size: 200%; }
 	&[rank="9"]::before{ content: "9"; }
 	&[rank="10"]::before{ content: "10"; }
 }
-.log .card-icons-container{ display: inline-block; width: 127px; vertical-align: middle; margin-top: -5px;
+.log .card-icons-container, .a-game-log .card-icons-container{ display: inline-block; width: 127px; vertical-align: middle; margin-top: -5px;
 	 .a-card-icon{ --card-icon-width: 45px; margin-top: 5px;
 		&[rank]::before{ font-size: calc(var(--card-icon-width)* 0.5); line-height: 98%; }
 	}
 }
 .mobile_version .log .card-icons-container{ width: calc(100% - 137px); }
+#replaylogs .player-selected-card-row{ margin-bottom: 8px; }
 
 body.desktop_version{
 	@media (min-width: 1670px) { --card-width: 150px; }
