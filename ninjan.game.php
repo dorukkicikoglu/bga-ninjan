@@ -279,8 +279,8 @@ class Ninjan extends Table
         $pileQueue = $this->pileManager->getPileQueue();
 
         foreach($pileQueue as $index => $cardData){
-            $this->incStat(($index + 1) / HAND_SIZE, 'avg_ranking_revealed_cards', $cardData['owner_id']);
-            $this->incStat(($index + 1) / (HAND_SIZE * $this->getPlayersNumber()), 'avg_ranking_revealed_cards_divide_num_players', $cardData['owner_id']);
+            $this->incStat(($index + 1) / HAND_SIZE, 'avg_ranking_revealed_cards', (int) $cardData['owner_id']);
+            $this->incStat(($index + 1) / (HAND_SIZE * $this->getPlayersNumber()), 'avg_ranking_revealed_cards_divide_num_players', (int) $cardData['owner_id']);
         }
 
         $cardsDataStr = []; //needed for the game replay page

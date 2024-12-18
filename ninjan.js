@@ -592,7 +592,7 @@ var HandHandler = /** @class */ (function () {
         });
         cards.reverse(); //reverse because they will be appended to first location
         cards.forEach(function (card) { dojo.place(card, _this.cardsContainer, 'first'); }); // Append cards in sorted order
-        this.orderCardsButton.innerHTML = _('sort by ' + (this.sortCardsBy == 'suit' ? 'rank' : 'suit'));
+        this.orderCardsButton.innerHTML = this.sortCardsBy == 'suit' ? _('sort by rank') : _('sort by suit');
         if (!doAnimate)
             return;
         var animations = [];
@@ -622,7 +622,7 @@ var HandHandler = /** @class */ (function () {
             suitToCards[card.suit].push(card);
         }
         var suitToStrength = {};
-        for (var suit in suitToStrength)
+        for (var suit in suitToCards)
             suitToStrength[suit] = this.gameui.getCardsStrength(suitToCards[suit]);
         return suitToStrength;
     };
@@ -831,32 +831,7 @@ var LogMutationObserver = /** @class */ (function () {
                 if (mutation.type === 'childList') {
                     mutation.addedNodes.forEach(function (node) {
                         if (node.nodeType === 1 && node.tagName.toLowerCase() === 'div' && node.classList.contains('log')) {
-                            var classTag = dojo.query('*[log-class-tag]', node);
-                            if (classTag.length > 0) {
-                                dojo.addClass(node, 'a-game-log ' + dojo.attr(classTag[0], 'log-class-tag'));
-                                classTag.forEach(dojo.destroy);
-                            }
-                            dojo.query('.playername', node).forEach(function (playerName) { dojo.attr(playerName, 'player-color', _this.gameui.rgbToHex(dojo.style(playerName, 'color'))); });
-                            if (dojo.hasClass(node, 'selected-cards-log')) {
-                                dojo.attr(node, 'first-selected-cards-log', Array.from(node.parentNode.children).some(function (sibling) { return sibling !== node && sibling.classList.contains("selected-cards-log"); }) ? 'false' : 'true'); //the first new-hand-long will have no margin-top or margin-bottom
-                            }
-                            else if (dojo.hasClass(node, 'take-pile-log')) {
-                                if (_this.gameui.isDesktop()) {
-                                    var cardIcons = dojo.query('.card-icons-container', node)[0];
-                                    cardIcons.style.width = 'calc(100% - ' + (10 + _this.gameui.getPos(dojo.query('.playername', node)[0]).w + _this.gameui.getPos(dojo.query('.log-arrow', node)[0]).w) + 'px)';
-                                }
-                            }
-                            if (_this.gameui.isDesktop() && dojo.hasClass(node, 'a-game-log')) {
-                                var timestamp = dojo.query('.timestamp', node);
-                                if (timestamp.length > 0) {
-                                    _this.nextTimestampValue = timestamp[0].innerText;
-                                }
-                                else if (_this.observeLogs.hasOwnProperty('nextTimestampValue')) {
-                                    var newTimestamp = dojo.create('div', { class: 'timestamp' });
-                                    newTimestamp.innerHTML = _this.nextTimestampValue;
-                                    dojo.place(newTimestamp, node);
-                                }
-                            }
+                            _this.processLogDiv(node);
                         }
                     });
                 }
@@ -870,6 +845,59 @@ var LogMutationObserver = /** @class */ (function () {
         // Start observing the container
         observer.observe($('logs'), config);
         observer.observe($('chatbar'), config); //mobile notifs
+        if (g_archive_mode) { //to observe replayLogs that appears at the bottom of the page on replays
+            var replayLogsObserverStarted_1 = false;
+            var replayLogsObserver = new MutationObserver(function (mutations, obs) {
+                for (var _i = 0, mutations_1 = mutations; _i < mutations_1.length; _i++) {
+                    var mutation = mutations_1[_i];
+                    if (mutation.addedNodes.length) {
+                        mutation.addedNodes.forEach(function (node) {
+                            if (!replayLogsObserverStarted_1 && node instanceof HTMLElement && node.id.startsWith('replaylogs')) {
+                                _this.processLogDiv(node);
+                            }
+                        });
+                    }
+                }
+            });
+            replayLogsObserver.observe(document.body, { childList: true, subtree: true });
+        }
+    };
+    LogMutationObserver.prototype.processLogDiv = function (node) {
+        var _this = this;
+        var classTag = dojo.query('*[log-class-tag]', node);
+        if (classTag.length > 0) {
+            dojo.addClass(node, 'a-game-log ' + dojo.attr(classTag[0], 'log-class-tag'));
+            classTag.forEach(dojo.destroy);
+        }
+        else if (dojo.query('.log-arrow-left, .log-arrow-right, .place-under-icon', node).length > 0) { //guarantee adding class in replay as preserve fields arent loaded
+            dojo.addClass(node, 'a-game-log');
+            if (dojo.query('.log-arrow-right', node).length > 0)
+                dojo.addClass(node, 'selected-cards-log');
+            else
+                dojo.addClass(node, 'take-pile-log');
+        }
+        dojo.query('.playername', node).forEach(function (playerName) { dojo.attr(playerName, 'player-color', _this.gameui.rgbToHex(dojo.style(playerName, 'color'))); });
+        if (dojo.hasClass(node, 'selected-cards-log')) {
+            dojo.attr(node, 'first-selected-cards-log', Array.from(node.parentNode.children).some(function (sibling) { return sibling !== node && sibling.classList.contains("selected-cards-log"); }) ? 'false' : 'true'); //the first new-hand-long will have no margin-top or margin-bottom
+        }
+        else if (dojo.hasClass(node, 'take-pile-log')) {
+            if (this.gameui.isDesktop()) {
+                var cardIcons = dojo.query('.card-icons-container', node)[0];
+                if (dojo.query('.playername', node).length > 0)
+                    cardIcons.style.width = 'calc(100% - ' + (10 + this.gameui.getPos(dojo.query('.playername', node)[0]).w + this.gameui.getPos(dojo.query('.log-arrow', node)[0]).w) + 'px)';
+            }
+        }
+        if (this.gameui.isDesktop() && dojo.hasClass(node, 'a-game-log')) {
+            var timestamp = dojo.query('.timestamp', node);
+            if (timestamp.length > 0) {
+                this.nextTimestampValue = timestamp[0].innerText;
+            }
+            else if (this.observeLogs.hasOwnProperty('nextTimestampValue')) {
+                var newTimestamp = dojo.create('div', { class: 'timestamp' });
+                newTimestamp.innerHTML = this.nextTimestampValue;
+                dojo.place(newTimestamp, node);
+            }
+        }
     };
     return LogMutationObserver;
 }());

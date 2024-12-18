@@ -11,7 +11,7 @@ class HandHandler{
         this.orderCardsButton = dojo.query('.order-cards-button', this.handContainer)[0];
 
         dojo.connect(this.orderCardsButton, 'onclick', () => { this.orderCardsButtonClicked(); });
-        dojo.connect(this.cardsContainer, 'onclick', (event) => { this.cardsContainerClicked(event); });
+        dojo.connect(this.cardsContainer, 'onclick', (event: Event) => { this.cardsContainerClicked(event); });
 
         if(this.owner.playerColor.toLowerCase() == 'ffffff')
             this.orderCardsButton.style.setProperty('--player-color', '#000000');
@@ -69,7 +69,7 @@ class HandHandler{
         cards.reverse(); //reverse because they will be appended to first location
         cards.forEach(card => { dojo.place(card, this.cardsContainer, 'first'); }); // Append cards in sorted order
 
-        this.orderCardsButton.innerHTML = _('sort by ' + (this.sortCardsBy == 'suit' ? 'rank' : 'suit'));
+        this.orderCardsButton.innerHTML = this.sortCardsBy == 'suit' ? _('sort by rank') : _('sort by suit');
 
         if(!doAnimate)
             return;
@@ -103,7 +103,7 @@ class HandHandler{
         }
 
         let suitToStrength: Record<number, number> = {};
-        for (let suit in suitToStrength)
+        for (let suit in suitToCards)
             suitToStrength[suit] = this.gameui.getCardsStrength(suitToCards[suit]);
 
         return suitToStrength;
@@ -127,7 +127,7 @@ class HandHandler{
         return diff;
     }
 
-    private cardsContainerClicked(event){
+    private cardsContainerClicked(event: Event){
         if(!['selectCard', 'takePile'].includes(this.gameui.gamedatas.gamestate.name) || this.gameui.isInterfaceLocked())
             return;
 

@@ -266,23 +266,27 @@ body.mobile_version {
   content: "10";
 }
 
-.log .card-icons-container {
+.log .card-icons-container, .a-game-log .card-icons-container {
   display: inline-block;
   width: 127px;
   vertical-align: middle;
   margin-top: -5px;
 }
-.log .card-icons-container .a-card-icon {
+.log .card-icons-container .a-card-icon, .a-game-log .card-icons-container .a-card-icon {
   --card-icon-width: 45px;
   margin-top: 5px;
 }
-.log .card-icons-container .a-card-icon[rank]::before {
+.log .card-icons-container .a-card-icon[rank]::before, .a-game-log .card-icons-container .a-card-icon[rank]::before {
   font-size: calc(var(--card-icon-width) * 0.5);
   line-height: 98%;
 }
 
 .mobile_version .log .card-icons-container {
   width: calc(100% - 137px);
+}
+
+#replaylogs .player-selected-card-row {
+  margin-bottom: 8px;
 }
 
 @media (min-width: 1670px) {
