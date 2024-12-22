@@ -92,16 +92,16 @@ body.mobile_version {
   cursor: pointer;
 }
 
-.current_player_is_active .gamestate_takePile .piles-container .a-pile-container[click-reason] .a-card {
+.gamestate_takePile .piles-container .a-pile-container[click-reason] .a-card {
   cursor: pointer;
 }
-.current_player_is_active .gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=take] {
+.gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=take] {
   animation: take-pile-glow-animation 1.4s ease-out infinite;
 }
-.current_player_is_active .gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=place_under] {
+.gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=place_under] {
   animation: place-under-pile-glow-animation 2.2s ease-out infinite;
 }
-.current_player_is_active .gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=place_under] .place-under-icon {
+.gamestate_takePile .piles-container .a-pile-container[click-reason][click-reason=place_under] .place-under-icon {
   opacity: 0.8;
 }
 
@@ -716,10 +716,10 @@ body.mobile_version {
 }
 .background-container .bg-ref-card {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, inset 0.3s;
   position: absolute;
   bottom: 0.9vh;
-  left: 1.3vw;
+  left: -3vw;
   width: calc(var(--char-width) * 0.95);
   height: calc(var(--char-width) * 0.95);
   border-radius: 100%;
@@ -736,6 +736,10 @@ body.mobile_version {
   top: 7%;
   left: 2%;
   opacity: 0.9;
+}
+.background-container .bg-ref-card.ref-card-visible {
+  opacity: 1;
+  left: 1.3vw;
 }
 
 .mobile_version .background-container {
@@ -773,8 +777,8 @@ body.mobile_version {
   left: -8px;
 }
 
-.current_player_is_active .bg-ref-card {
-  opacity: 1;
+.game_tutorial_mode .background-container .bg-scissors {
+  bottom: -2px;
 }
 
 .dijitTooltipContainer:has(.tooltip-wrapper) {

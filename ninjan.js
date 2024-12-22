@@ -235,14 +235,16 @@ var GameBody = /** @class */ (function (_super) {
         console.log('Entering state: ' + stateName, args);
         switch (stateName) {
             case 'selectCard':
+                if (!args.args._private.autoPlay && !args.args._private.selected_card_id)
+                    this.showRefCard();
                 if (this.myself)
                     this.myself.hand.updateConfirmedSelection(args.args._private.selected_card_id, false);
                 break;
             case 'takePile':
                 dojo.addClass(this.pileHandler.pilesRow, 'expanded');
+                if (this.isCurrentPlayerActive() && !args.args.autoPlay)
+                    this.showRefCard();
                 this.pileHandler.showPossiblePiles(args.args.possible_piles);
-                break;
-            case 'dummmy':
                 break;
         }
     };
@@ -284,11 +286,14 @@ var GameBody = /** @class */ (function (_super) {
     GameBody.prototype.notif_cardSelectionConfirmed = function (notif) {
         console.log('notif_cardSelectionConfirmed');
         console.log(notif);
+        this.hideRefCard();
         this.myself.hand.updateConfirmedSelection(notif.args.confirmed_selected_card_id, notif.args.pre_selection);
     };
     GameBody.prototype.notif_cardSelectionReverted = function (notif) {
         console.log('notif_cardSelectionReverted');
         console.log(notif);
+        if (!notif.args.pre_selection)
+            this.showRefCard();
         this.myself.hand.updateConfirmedSelection(false, notif.args.pre_selection);
     };
     GameBody.prototype.notif_animateSelectedCards = function (notif) {
@@ -304,6 +309,7 @@ var GameBody = /** @class */ (function (_super) {
         console.log(notif);
         if (parseInt(notif.args.new_score) == notif.args.new_score)
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
+        this.hideRefCard();
         this.pileHandler.animatePileTaken(notif.args.player_id, notif.args.pile_index, notif.args.selected_card_data, notif.args.reason, notif.args.autoPlay, notif.args.card_icons_data || []);
     };
     GameBody.prototype.notif_endingGameNoCardCanBeTaken = function (notif) {
@@ -434,6 +440,8 @@ var GameBody = /** @class */ (function (_super) {
         cardsData.forEach(function (cardData) { logHTML += '<div class="player-selected-card-row">' + _this.divColoredPlayer(cardData.owner_id, { class: 'playername' }, false) + '<div class="log-arrow log-arrow-right">➜</div><div class="card-icons-container">' + _this.createCardIcons([cardData]) + '</div></div>'; });
         return logHTML;
     };
+    GameBody.prototype.showRefCard = function () { dojo.query('.bg-ref-card').forEach(function (node) { return dojo.addClass(node, 'ref-card-visible'); }); };
+    GameBody.prototype.hideRefCard = function () { dojo.query('.bg-ref-card').forEach(function (node) { return dojo.removeClass(node, 'ref-card-visible'); }); };
     GameBody.prototype.preloadFont = function () {
         var preloadLink = document.createElement('link');
         preloadLink.rel = 'preload';

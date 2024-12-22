@@ -202,8 +202,13 @@ class Ninjan extends Table
     {
         $selectedCardIDs = $this->getCollectionFromDb("SELECT player_id, selected_card_id FROM player", true);
         $privateData = [];
-        foreach($selectedCardIDs as $player_id => $selectedCardID)
-            $privateData[$player_id]['selected_card_id'] = $selectedCardID;
+        $autoPlayCards = $this->shouldAutoSelectCards();
+        $autoPlayPlayerIDs = array_fill_keys(array_column($autoPlayCards, 'playerID'), true); //playerIDs of every player who will auto play a card
+
+        foreach($selectedCardIDs as $playerID => $selectedCardID){
+            $privateData[$playerID]['selected_card_id'] = $selectedCardID;
+            $privateData[$playerID]['autoPlay'] = isset($autoPlayPlayerIDs[$playerID]);
+        }
 
         return ['_private' => $privateData];
     }
@@ -211,7 +216,8 @@ class Ninjan extends Table
     function argTakePile(){ 
         return [
             'textPlayerID' => $this->getActivePlayerId(),
-            'possible_piles' => $this->pileManager->getPossiblePiles()
+            'possible_piles' => $this->pileManager->getPossiblePiles(),
+            'autoPlay' => $this->shouldAutoTakePile() !== null
         ]; 
     }
 
@@ -250,21 +256,12 @@ class Ninjan extends Table
      */
 
     public function stSelectCard(): void {
-        $preSelectedCards = $this->getCollectionFromDb("SELECT player_id, pre_selected_card_id FROM `player` WHERE pre_selected_card_id IS NOT NULL;", true);
-
+        $autoPlayCards = $this->shouldAutoSelectCards();
         self::DbQuery("UPDATE player SET selected_card_id = NULL, pre_selected_card_id = NULL, made_card_selection_this_round = 'false'");
         $this->gamestate->setAllPlayersMultiactive();
 
-        if($this->tableManager->isLastCards()){ // auto-play last cards of hands
-            $playerCards = $this->getObjectListFromDB( "SELECT card_id, card_location_arg as player_id FROM cards WHERE card_location = 'player'" );
-            foreach($playerCards as $index => $row)
-                $this->actSelectCard($row['card_id'], $row['player_id']);
-
-            return;
-        }
-
-        foreach($preSelectedCards as $playerID => $cardID)
-            $this->actSelectCard($cardID, $playerID);
+        foreach($autoPlayCards as $index => $autoPlayData)
+            $this->actSelectCard($autoPlayData['cardID'], $autoPlayData['playerID']);
     }
 
     public function stDisplaySelectedCards(): void {
@@ -301,26 +298,9 @@ class Ninjan extends Table
     }
 
     public function stTakePile(): void {
-        $possiblePiles = $this->pileManager->getPossiblePiles();
-        $activePlayerID = $this->getActivePlayerId();
-
-        if($possiblePiles['reason'] == 'take'){
-            if(count($possiblePiles['pile_indices']) == 1)
-                $this->actTakePile($possiblePiles['pile_indices'][0], true);
-            else if($this->globalsManager->getPref('auto_take_best_pile', $activePlayerID) == AUTO_TAKE_BEST_PILE_ON){
-                $bestPileScore = -INF;
-                $bestPileIndex = false;
-                foreach($possiblePiles['pile_indices'] as $index => $pileIndex){
-                    $pileSum = (int) $this->getUniqueValueFromDB("SELECT SUM(rank) FROM cards WHERE card_location = 'pile' AND card_location_arg = $pileIndex");
-                    if($pileSum > $bestPileScore){
-                        $bestPileScore = $pileSum;
-                        $bestPileIndex = $pileIndex;
-                    }
-                }
-                $this->actTakePile($bestPileIndex, true);
-            }
-        }
-
+        $autoTakePileIndex = $this->shouldAutoTakePile();
+        if($autoTakePileIndex !== null)
+            $this->actTakePile($autoTakePileIndex, true);
     }
 
     public function stNextPlayer(): void {
@@ -524,6 +504,11 @@ class Ninjan extends Table
         }
     }
 
+    function getCardLogHTML($cardData){
+        $suitData = SUIT_DATA[(int) $cardData['suit']];
+        return '<span style="color:#'.$suitData['colorCode'].';">'.$cardData['rank'].'&nbsp;<span style="position: absolute;opacity: 0;width: 0px;height: 0px;">'.$suitData['name'].'</span>'.$suitData['font-awesome'].'</span>';
+    }
+
     function shouldEndGameEarly($pileQueue){
         if($this->tableManager->getRemainingPlayerCardsCount() > 0)
             return false;
@@ -538,9 +523,44 @@ class Ninjan extends Table
         return true;
     }
 
-    function getCardLogHTML($cardData){
-        $suitData = SUIT_DATA[(int) $cardData['suit']];
-        return '<span style="color:#'.$suitData['colorCode'].';">'.$cardData['rank'].'&nbsp;<span style="position: absolute;opacity: 0;width: 0px;height: 0px;">'.$suitData['name'].'</span>'.$suitData['font-awesome'].'</span>';
+    private function shouldAutoTakePile(): ?int{
+        $possiblePiles = $this->pileManager->getPossiblePiles();
+        $activePlayerID = $this->getActivePlayerId();
+
+        if($possiblePiles['reason'] == 'take'){
+            if(count($possiblePiles['pile_indices']) == 1)
+                return $possiblePiles['pile_indices'][0];
+            else if($this->globalsManager->getPref('auto_take_best_pile', $activePlayerID) == AUTO_TAKE_BEST_PILE_ON){
+                $bestPileScore = -INF;
+                $bestPileIndex = false;
+                foreach($possiblePiles['pile_indices'] as $index => $pileIndex){
+                    $pileSum = (int) $this->getUniqueValueFromDB("SELECT SUM(rank) FROM cards WHERE card_location = 'pile' AND card_location_arg = $pileIndex");
+                    if($pileSum > $bestPileScore){
+                        $bestPileScore = $pileSum;
+                        $bestPileIndex = $pileIndex;
+                    }
+                }
+                return $bestPileIndex;
+            }
+        }
+
+        return null;
+    }
+
+    private function shouldAutoSelectCards(): array{
+        $autoPlayCards = [];
+        if($this->tableManager->isLastCards()){ // auto-play last cards of hands
+            $playerCards = $this->getObjectListFromDB( "SELECT card_id, card_location_arg as player_id FROM cards WHERE card_location = 'player'" );
+            foreach($playerCards as $index => $row)
+                $autoPlayCards[] = ['cardID' => $row['card_id'], 'playerID' => $row['player_id']];
+        } else {
+            $preSelectedCards = $this->getCollectionFromDb("SELECT player_id, pre_selected_card_id FROM `player` WHERE pre_selected_card_id IS NOT NULL;", true);
+
+            foreach($preSelectedCards as $playerID => $cardID)
+                $autoPlayCards[] = ['cardID' => $cardID, 'playerID' => $playerID];
+        }
+
+        return $autoPlayCards;
     }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -560,33 +580,6 @@ class Ninjan extends Table
 
         self::trace("Logging: <span style='color: $color;'>$txt</span>");
         self::notifyAllPlayers('plop',"<textarea style='height: 104px; width: 230px;color:$color'>$txt</textarea>",array());
-    }
-
-    public function loadBugReportSQL(int $reportId, array $studioPlayers): void {
-        $prodPlayers = $this->getObjectListFromDb('SELECT player_id FROM player', true);
-        if (count($prodPlayers) != count($studioPlayers))
-            throw new BgaVisibleSystemException("Incorrect player count (bug report has $prodCount players, studio table has $studioCount players)");
-        
-        // Change for your game
-        // We are setting the current state to match the start of a player's turn if it's already game over
-        $sql = ['UPDATE global SET global_value=10 WHERE global_id=1 AND global_value=99'];
-        foreach ($prodPlayers as $index => $prodId) {
-            $studioPlayer = $studioPlayers[$index];
-
-            // All games can keep this SQL
-            $sql[] = "UPDATE player SET player_id=$studioPlayer WHERE player_id=$prodId";
-            $sql[] = "UPDATE global SET global_value=$studioPlayer WHERE global_value=$prodId";
-            $sql[] = "UPDATE stats SET stats_player_id=$studioPlayer WHERE stats_player_id=$prodId";
-
-            // Add game-specific SQL update the tables for your game
-            $sql[] = "UPDATE cards SET card_location_arg=$studioPlayer WHERE card_location_arg = $prodId";
-        }
-  
-        foreach ($sql as $q) {
-            $this->DbQuery($q);
-        }
-        
-        $this->reloadPlayersBasicInfos();
     }
 
     /**
