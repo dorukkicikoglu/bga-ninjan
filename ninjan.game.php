@@ -25,6 +25,12 @@ require_once ('modules/php/NJNPileManager.php');
 
 class Ninjan extends Table
 {
+    public NJNGlobalsManager $globalsManager;
+    public $cardsDeck;
+    public NJNHandManager $handManager;
+    public NJNTableManager $tableManager;
+    public NJNPileManager $pileManager;
+    
     /**
      * Your global variables labels:
      *
@@ -377,7 +383,7 @@ class Ninjan extends Table
      * - when the game starts
      * - when a player refreshes the game page (F5)
      */
-    protected function getAllDatas()
+    protected function getAllDatas(): array
     {
         $result = [];
         $result['version'] = intval($this->gamestate->table_globals[300]);

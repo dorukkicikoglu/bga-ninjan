@@ -412,9 +412,7 @@ body.mobile_version {
   text-shadow: 2px 0 #f0f0f0, -2px 0 #f0f0f0, 0 2px #f0f0f0, 0 -2px #f0f0f0, 1px 1px #f0f0f0, -1px -1px #f0f0f0, 1px -1px #f0f0f0, -1px 1px #f0f0f0;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
-  -khtml-user-select: none;
   -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
 }
 .my-hand-container .order-cards-button {
@@ -557,9 +555,7 @@ body.mobile_version {
   text-shadow: 2px 0 #f0f0f0, -2px 0 #f0f0f0, 0 2px #f0f0f0, 0 -2px #f0f0f0, 1px 1px #f0f0f0, -1px -1px #f0f0f0, 1px -1px #f0f0f0, -1px 1px #f0f0f0;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
-  -khtml-user-select: none;
   -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
   transition: opacity 0.3s;
 }
@@ -580,6 +576,7 @@ body.mobile_version {
 }
 .mobile_version .piles-row.expanded .pile-queue-container {
   display: block;
+  width: -moz-fit-content;
   width: fit-content;
   position: relative;
   left: 50%;
@@ -897,21 +894,10 @@ body.mobile_version {
   display: inline-block;
 }
 .log-arrow.log-arrow-left {
-  font-weight: bold;
-  color: #5aaa0e;
-  font-size: 30px;
-  width: 18px;
-  margin-right: -2px;
-  margin-left: -2px;
-  height: 20px;
-  line-height: 17px;
-  overflow-x: hidden;
-  overflow-y: clip;
-  margin-top: 1px;
-  vertical-align: middle;
+  color: #35b935;
 }
 .log-arrow.log-arrow-right {
-  color: #000 !important;
+  color: #000 !important; font-size: 16px;
 }
 .log-arrow.place-under-icon {
   color: var(--place-under-log-color);
@@ -1102,6 +1088,4 @@ body.mobile_version {
   100% {
     transform: scale(1);
   }
-}
-
-/*# sourceMappingURL=ninjan.css.map */
+}/*# sourceMappingURL=ninjan.css.map */

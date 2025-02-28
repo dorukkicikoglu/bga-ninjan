@@ -340,7 +340,7 @@ var GameBody = /** @class */ (function (_super) {
                         else if (key == 'REVEALED_CARDS_DATA_STR')
                             args['REVEALED_CARDS_DATA_STR'] = this.createLogSelectedCards(args['REVEALED_CARDS_DATA']);
                         else if (key == 'ARROW_LEFT')
-                            args['ARROW_LEFT'] = '<div class="log-arrow log-arrow-left">⇐</div>';
+                            args['ARROW_LEFT'] = '<i class="log-arrow log-arrow-left fa6 fa-angle-double-left"></i>';
                         else if (key == 'ARROW_DOWN')
                             args['ARROW_DOWN'] = '<i class="log-arrow place-under-icon fa6 fa-share"></i>';
                         else if (key == 'PILE_NUM')
@@ -437,7 +437,7 @@ var GameBody = /** @class */ (function (_super) {
     GameBody.prototype.createLogSelectedCards = function (cardsData) {
         var _this = this;
         var logHTML = '';
-        cardsData.forEach(function (cardData) { logHTML += '<div class="player-selected-card-row">' + _this.divColoredPlayer(cardData.owner_id, { class: 'playername' }, false) + '<div class="log-arrow log-arrow-right">➜</div><div class="card-icons-container">' + _this.createCardIcons([cardData]) + '</div></div>'; });
+        cardsData.forEach(function (cardData) { logHTML += '<div class="player-selected-card-row">' + _this.divColoredPlayer(cardData.owner_id, { class: 'playername' }, false) + '<i class="log-arrow log-arrow-right fa6 fa-arrow-right"></i><div class="card-icons-container">' + _this.createCardIcons([cardData]) + '</div></div>'; });
         return logHTML;
     };
     GameBody.prototype.showRefCard = function () { dojo.query('.bg-ref-card').forEach(function (node) { return dojo.addClass(node, 'ref-card-visible'); }); };

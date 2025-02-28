@@ -4,6 +4,15 @@
 /** @noinspection PhpInconsistentReturnPointsInspection */
 /** @noinspection PhpUnreachableStatementInspection */
 
+namespace Bga\GameFramework\Actions {
+    #[\Attribute]
+    class CheckAction {
+        public function __construct(
+            public bool $enabled = true,
+        ) {}
+    }
+}
+
 namespace Bga\GameFramework\Actions\Types {
     #[\Attribute]
     class IntParam {
@@ -13,7 +22,7 @@ namespace Bga\GameFramework\Actions\Types {
             public ?int $max = null,
         ) {}
 
-        public function getValue(string $paramName): int {}
+        public function getValue(string $paramName): int { return 0; }
     }
 
     #[\Attribute]
@@ -22,7 +31,7 @@ namespace Bga\GameFramework\Actions\Types {
             ?string $name = null,
         ) {}
 
-        public function getValue(string $paramName): bool {}
+        public function getValue(string $paramName): bool { return false; }
     }
 
     #[\Attribute]
@@ -33,7 +42,7 @@ namespace Bga\GameFramework\Actions\Types {
             public ?float $max = null,
         ) {}
 
-        public function getValue(string $paramName): float {}
+        public function getValue(string $paramName): float { return 0; }
     }
 
     #[\Attribute]
@@ -44,7 +53,7 @@ namespace Bga\GameFramework\Actions\Types {
             public ?int $max = null,
         ) {}
 
-        public function getValue(string $paramName): array {}
+        public function getValue(string $paramName): array { return []; }
     }
 
     #[\Attribute]
@@ -57,7 +66,7 @@ namespace Bga\GameFramework\Actions\Types {
             public ?array $enum = null,
         ) {}
     
-        public function getValue(string $paramName): string {}
+        public function getValue(string $paramName): string { return ''; }
     }
 
     #[\Attribute]
@@ -68,11 +77,172 @@ namespace Bga\GameFramework\Actions\Types {
             public ?bool $alphanum = true, 
         ) {}
     
-        public function getValue(string $paramName): mixed {}    
+        public function getValue(string $paramName): mixed { return []; }    
+    }
+}
+
+namespace Bga\GameFramework {
+    abstract class Notify {
+        /**
+         * Add a decorator function, to be applied on args when a notif function is called.
+         */
+        public function addDecorator(callable $fn) {
+           //
+        }
+
+        /**
+         * Send a notification to a single player of the game.
+         *
+         * @param int $playerId the player ID to send the notification to.
+         * @param string $notifName a comprehensive string code that explain what is the notification for.
+         * @param string $message some text that can be displayed on player's log window (should be surrounded by clienttranslate if not empty).
+         * @param array $args notification arguments.
+         */
+        public function player(int $playerId, string $notifName, ?string $message = '', array $args = []): void {
+            //
+        }
+
+        /**
+         * Send a notification to all players of the game and spectators (public).
+         *
+         * @param string $notifName a comprehensive string code that explain what is the notification for.
+         * @param string $message some text that can be displayed on player's log window (should be surrounded by clienttranslate if not empty).
+         * @param array $args notification arguments.
+         */
+        public function all(string $notifName, ?string $message = '', array $args = []): void {
+            //
+        }
+    }
+}
+
+namespace Bga\GameFramework\Db {
+    abstract class Globals
+    {
+        /**
+         * Delete global variables.
+         */
+        public function delete(string ...$names): void
+        {
+            //
+        }
+
+        /**
+         * Returns the value of `$name` if it exists. Otherwise, fallback on `$defaultValue`.
+         */
+        public function get(string $name, mixed $defaultValue = null): mixed
+        {
+            return null;
+        }
+        
+        /**
+         * Retrieve all variables stored in DB (or a selected subset, if the function is called with parameters).
+         */
+        public function getAll(string ...$names): array
+        {
+            return [];
+        }
+
+        /**
+         * Returns true if globals has a key `$name`.
+         */
+        public function has(string $name): bool
+        {
+            return false;
+        }
+
+        /**
+         * Increment the global `$name` by `$step`.
+         *
+         * @throws BgaSystemException if the global `$name` is not a numeric value.
+         */
+        public function inc(string $name, int $step): int
+        {
+            return 0;
+        }
+
+        /**
+         * Set `$name` with the value `$value`.
+         */
+        public function set(string $name, mixed $value): void
+        {
+            //
+        }
     }
 }
 
 namespace {
+    /**
+     * Base class for database interactions in BGA.
+     */
+    abstract class APP_DbObject
+    {
+        /**
+         * Performs a query on the database.
+         *
+         * @see https://en.doc.boardgamearena.com/Main_game_logic:_yourgamename.game.php#Accessing_the_database
+         */
+        final static public function DbQuery(string $sql): ?bool
+        {
+            return null;
+        }
+
+        /**
+         * Returns an array of rows for a SQL SELECT query.
+         *
+         * If `$bUniqueValue = true`, returns a simple array of values.
+         */
+        final static public function getObjectListFromDB(string $sql, bool $bUniqueValue = false): array
+        {
+            return [];
+        }
+
+        /**
+         * Returns a single row as an associative array.
+         */
+        final static public function getObjectFromDB(string $sql): ?array
+        {
+            return null;
+        }
+
+        /**
+         * Returns a unique value from the database, or `null` if no value is found.
+         */
+        final static public function getUniqueValueFromDB(string $sql): mixed
+        {
+            return null;
+        }
+
+        /**
+         * Escape a string for safe use in SQL queries.
+         */
+        final static public function escapeStringForDB(string $string): string
+        {
+            return addslashes($string);
+        }
+
+        /**
+         * Returns an associative array of rows for a SQL SELECT statement.
+         *
+         * The first column is used as the key, and the entire row is the value.
+         * If `$bSingleValue` is `true`, it returns `column1 => column2` instead of `column1 => [column1, column2]`.
+         */
+        final static public function getCollectionFromDB(string $sql, bool $bSingleValue = false): array
+        {
+            return [];
+        }
+
+        /**
+         * Returns an associative array of rows for a SQL SELECT statement.
+         * The first array level corresponds to the first column, and the second level corresponds to the second column.
+         * 
+         * If `$bSingleValue = true`, it returns column1 => column2 instead of column1 => [column1, column2].
+         */
+        final static public function getDoubleKeyCollectionFromDB(string $sql, bool $bSingleValue = false): array
+        {
+            return [];
+        }
+    }
+
     exit("This file should not be included, only analyzed by your IDE");
 
     /**
@@ -94,7 +264,7 @@ namespace {
      */
     function clienttranslate(string $text): string
     {
-        //
+        return ''; 
     }
 
     /**
@@ -103,7 +273,11 @@ namespace {
      */
     function totranslate(string $text): string
     {
-        //
+        return ''; 
+    }
+
+    function bga_rand(int $min, int $max): int {
+        return 0;
     }
 
     abstract class APP_Object
@@ -214,7 +388,7 @@ namespace {
          */
         final protected function _(string $text): string
         {
-            //
+            return ''; 
         }
 
         /**
@@ -224,12 +398,20 @@ namespace {
 
         final protected function raw(string $string): array
         {
-            //
+            return [];
         }
     }
 
     abstract class GameState extends APP_Object
     {
+        /**
+         * Stores global table values.
+         * Indexed array where each key corresponds to a global ID.
+         *
+         * @var array<int, mixed>
+         */
+        public array $table_globals = [];
+
         /**
          * You can call this method to make any player active.
          *
@@ -261,7 +443,7 @@ namespace {
          */
         final public function getActivePlayerList(): array
         {
-            //
+            return [];
         }
 
         /**
@@ -269,7 +451,7 @@ namespace {
          */
         final public function getPrivateState(int $playerId): array
         {
-            //
+            return [];
         }
 
         /**
@@ -324,7 +506,7 @@ namespace {
          */
         final public function isMutiactiveState(): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -335,7 +517,7 @@ namespace {
          */
         final public function isPlayerActive(int $player_id): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -397,7 +579,7 @@ namespace {
          *
          * @see states.inc.php
          */
-        final public function nextState(string $transition): void
+        final public function nextState(string $transition = ''): void
         {
             //
         }
@@ -427,9 +609,9 @@ namespace {
         /**
          * All playing players are made inactive. Transition to next state.
          */
-        final public function setAllPlayersNonMultiactive(string $nextState): void
+        final public function setAllPlayersNonMultiactive(string $nextState): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -441,7 +623,7 @@ namespace {
          */
         final public function setPlayerNonMultiactive(int $player, string $nextState): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -458,7 +640,7 @@ namespace {
          */
         final public function setPlayersMultiactive(array $players, string $nextState, bool $bInactivePlayersNotOnTheList = false): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -483,7 +665,7 @@ namespace {
          */
         final public function state(bool $bSkipStateArgs = false, bool $bOnlyVariableContent = false, bool $bSkipReflexionTimeLoad = false): array
         {
-            //
+            return [];
         }
 
         /**
@@ -492,7 +674,7 @@ namespace {
          */
         final public function state_id(): string|int
         {
-            //
+            return '0'; 
         }
 
         /**
@@ -553,55 +735,10 @@ namespace {
         }
     }
 
-    abstract class Globals
-    {
-        /**
-         * Delete global variables.
-         *
-         * @param string[] ...$names
-         */
-        public function delete(...$names): void
-        {
-            //
-        }
-
-        /**
-         * Returns the value of `$name` if it exists. Otherwise, fallback on `$defaultValue`.
-         */
-        public function get(string $name, mixed $defaultValue = null): mixed
-        {
-            //
-        }
-
-        /**
-         * Returns true if globals has a key `$name`.
-         */
-        public function has(string $name): bool
-        {
-            //
-        }
-
-        /**
-         * Increment the global `$name` by `$step`.
-         *
-         * @throws BgaSystemException if the global `$name` is not a numeric value.
-         */
-        public function inc(string $name, int $step): int
-        {
-            //
-        }
-
-        /**
-         * Set `$name` with the value `$value`.
-         */
-        public function set(string $name, mixed $value): void
-        {
-            //
-        }
-    }
-
     abstract class Table extends APP_Object
     {
+        public bool $not_a_move_notification;
+
         /**
          * Access the underlying game state object.
          */
@@ -610,7 +747,12 @@ namespace {
         /**
          * Access the underlying global values.
          */
-        readonly public Globals $globals;
+        readonly public \Bga\GameFramework\Db\Globals $globals;
+
+        /**
+         * Access the underlying Notify object.
+         */
+        readonly public \Bga\GameFramework\Notify $notify;
 
         /**
          * Default constructor.
@@ -628,7 +770,7 @@ namespace {
          */
         final static public function DbAffectedRow(): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -639,7 +781,7 @@ namespace {
          */
         final static public function DbGetLastId(): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -649,7 +791,7 @@ namespace {
          */
         final static public function DbQuery(string $sql): null|mysqli_result|bool
         {
-            //
+            return null;
         }
 
         /**
@@ -665,7 +807,7 @@ namespace {
          */
         final static public function escapeStringForDB(string $string): string
         {
-            //
+            return ''; 
         }
 
         /**
@@ -680,7 +822,7 @@ namespace {
          */
         final static public function getObjectListFromDB(string $sql, bool $bUniqueValue = false): array
         {
-            //
+            return [];
         }
 
         /**
@@ -691,7 +833,7 @@ namespace {
          */
         final static public function getUniqueValueFromDB(string $sql): mixed
         {
-            //
+            return null;
         }
 
         /**
@@ -700,11 +842,11 @@ namespace {
          * NOTE: You **cannot** use this method in an `activeplayer` or `multipleactiveplayer` state. You must use a
          * `game` type game state for this.
          *
-         * @return void
+         * @return int the new active player id
          */
-        final public function activeNextPlayer(): void
+        final public function activeNextPlayer(): int|string
         {
-            //
+            return '0';
         }
 
         /**
@@ -725,7 +867,7 @@ namespace {
          */
         final public function checkAction(string $actionName, bool $bThrowException = true): mixed
         {
-            //
+            return null;
         }
 
         /**
@@ -749,7 +891,7 @@ namespace {
          */
         final public function getActivePlayerId(): string|int
         {
-            //
+            return '0'; 
         }
 
         /**
@@ -759,7 +901,7 @@ namespace {
          */
         final public function getActivePlayerName(): string
         {
-            //
+            return ''; 
         }
 
         /**
@@ -786,7 +928,7 @@ namespace {
          */
         final public function getCollectionFromDB(string $sql, bool $bSingleValue = false): array
         {
-            //
+            return [];
         }
 
         /**
@@ -799,7 +941,7 @@ namespace {
          */
         final public function getCurrentPlayerId(bool $bReturnNullIfNotLogged = false): string|int
         {
-            //
+            return '0';
         }
 
         /**
@@ -812,7 +954,7 @@ namespace {
          */
         final public function getDoubleKeyCollectionFromDB(string $sql, bool $bSingleValue = false): array
         {
-            //
+            return [];
         }
 
         /**
@@ -820,7 +962,7 @@ namespace {
          */
         final public function getGameLanguage(): string
         {
-            //
+            return '';
         }
 
         /**
@@ -845,9 +987,9 @@ namespace {
          * NOTE: this method use globals "cache" if you directly manipulated globals table OR call this function after
          * `undoRestorePoint()` - it won't work as expected.
          */
-        final public function getGameStateValue(string $label, int $default = 0): int
+        final public function getGameStateValue(string $label, ?int $default = null): int|string
         {
-            //
+            return '0';
         }
 
         /**
@@ -856,7 +998,7 @@ namespace {
          */
         final public function getGameUserPreference(int $playerId, int $prefId): ?int
         {
-            //
+            return 0;
         }
 
         /**
@@ -893,7 +1035,7 @@ namespace {
          */
         final public function getGameinfos(): array
         {
-            //
+            return [];
         }
 
         /**
@@ -905,7 +1047,7 @@ namespace {
          */
         final public function getNextPlayerTable(): array
         {
-            //
+            return [];
         }
 
         /**
@@ -917,7 +1059,7 @@ namespace {
          */
         final public function getNonEmptyCollectionFromDB(string $sql): array
         {
-            //
+            return [];
         }
 
         /**
@@ -930,7 +1072,7 @@ namespace {
          */
         final public function getNonEmptyObjectFromDB(string $sql): array
         {
-            //
+            return [];
         }
 
         /**
@@ -942,7 +1084,7 @@ namespace {
          */
         final public function getObjectFromDB(string $sql): array
         {
-            //
+            return [];
         }
 
         /**
@@ -950,7 +1092,7 @@ namespace {
          */
         final public function getPlayerAfter(int $playerId): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -958,7 +1100,7 @@ namespace {
          */
         final public function getPlayerBefore(int $playerId): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -966,7 +1108,7 @@ namespace {
          */
         final public function getPlayerColorById(int $playerId): string
         {
-            //
+            return '';
         }
 
         /**
@@ -974,7 +1116,7 @@ namespace {
          */
         final public function getPlayerNameById(int $playerId): string
         {
-            //
+            return '';
         }
 
         /**
@@ -982,7 +1124,7 @@ namespace {
          */
         final public function getPlayerNoById(int $playerId): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -990,7 +1132,7 @@ namespace {
          *
          * @return int
          */
-        final public function getPlayersNumber()
+        public function getPlayersNumber()
         {
             //
         }
@@ -1016,7 +1158,7 @@ namespace {
          */
         public function getSpecificColorPairings(): array
         {
-            //
+            return [];
         }
 
         /**
@@ -1045,7 +1187,7 @@ namespace {
          */
         final public function incGameStateValue(string $label, int $increment): int
         {
-            //
+            return 0;
         }
 
         /**
@@ -1081,7 +1223,7 @@ namespace {
          */
         final public function isAsync(): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -1089,7 +1231,7 @@ namespace {
          */
         final public function isRealtime(): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -1101,7 +1243,7 @@ namespace {
          */
         final public function isSpectator(): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -1126,6 +1268,9 @@ namespace {
         /**
          * Send a notification to all players of the game and spectators (public).
          *
+         * @param string $notification_type a comprehensive string code that explain what is the notification for.
+         * @param string $notification_log some text that can be displayed on player's log window (should be surrounded by clienttranslate if not empty).
+         * @param array $notification_args notification arguments.
          * @see https://en.doc.boardgamearena.com/Main_game_logic:_yourgamename.game.php#NotifyAllPlayers
          */
         final public function notifyAllPlayers(string $notificationType, string $notificationLog, array $notificationArgs): void
@@ -1134,9 +1279,13 @@ namespace {
         }
 
         /**
-         * Send a notification to a single players of the game.
+         * Send a notification to a single player of the game.
          *
-         * @see https://en.doc.boardgamearena.com/Main_game_logic:_yourgamename.game.php#NotifyPlayer
+         * @param int $player_id the player ID to send the notification to.
+         * @param string $notification_type a comprehensive string code that explain what is the notification for.
+         * @param string $notification_log some text that can be displayed on player's log window (should be surrounded by clienttranslate if not empty).
+         * @param array $notification_args notification arguments.
+         * @see https://en.doc.boardgamearena.com/Main_game_logic:_yourgamename.game.php#NotifyAllPlayers
          */
         final public function notifyPlayer(int $playerId, string $notificationType, string $notificationLog, array $notificationArgs): void
         {
@@ -1187,7 +1336,7 @@ namespace {
          */
         final public function retrieveLegacyData($playerId, $key): array
         {
-            //
+            return [];
         }
 
         /**
@@ -1196,7 +1345,7 @@ namespace {
          */
         final public function retrieveLegacyTeamData(): array
         {
-            //
+            return [];
         }
 
         /**
@@ -1302,12 +1451,17 @@ namespace {
          * Translation function using appropriate gettext domain.
          */
         protected function _(string $text): string
-        {
-            //
+        {            
+            return '';
         }
 
         /**
          * Make the previous player active (in the natural player order).
+         *
+         * NOTE: You **cannot** use this method in an `activeplayer` or `multipleactiveplayer` state. You must use a
+         * `game` type game state for this.
+         *
+         * @return int the new active player id
          */
         final protected function activePrevPlayer(): void
         {
@@ -1335,7 +1489,7 @@ namespace {
          *
          * @return array
          */
-        abstract protected function getAllDatas();
+        abstract protected function getAllDatas(): array;
 
         /**
          * Get the "current_player" color.
@@ -1346,7 +1500,7 @@ namespace {
          */
         final protected function getCurrentPlayerColor(): string
         {
-            //
+            return '';
         }
 
         /**
@@ -1358,7 +1512,7 @@ namespace {
          */
         final protected function getCurrentPlayerName($bReturnEmptyIfNotLogged = false): string
         {
-            //
+            return '';
         }
 
         /**
@@ -1372,10 +1526,12 @@ namespace {
 
         /**
          * Return an associative array which associate each player with the previous player around the table.
+         *
+         * @return array<int, int>
          */
         final protected function getPrevPlayerTable($players): array
         {
-            //
+            return [];
         }
 
         /**
@@ -1414,7 +1570,7 @@ namespace {
          */
         final protected function isCurrentPlayerZombie(): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -1443,6 +1599,37 @@ namespace {
          * @return void
          */
         abstract protected function zombieTurn(array $state, int $active_player): void;
+
+        /**
+         * To get a Deck instance with `$this->getNew("module.common.deck")`
+         */
+        protected function getNew(string $objectName): mixed {
+            return null;
+        }
+    
+        /**
+         * Apply an SQL upgrade of the tables.
+         * Use DBPREFIX_<table_name> for all tables in the $sql parameter.
+         */
+        function applyDbUpgradeToAllDB(string $sql): void {
+        }
+
+        /**
+         * For authorized games using external API only.
+         */
+        function getGenericGameInfos(string $api, array $args = []) : array {
+            return [];
+        }
+
+        /**
+         * Return the BGA environment this table is running on.
+         * This should be used for debug purpose only.
+         * 
+         * @return string "studio" or "prod"
+         */
+        static function getBgaEnvironment(): string {
+            return '';
+        }
     }
 
     /** An integer. */
@@ -1525,7 +1712,7 @@ namespace {
          */
         final protected function getArg(string $argName, int $argType, bool $bMandatory = false, mixed $default = null, array $argTypeDetails = [], bool $bCanFail = false): mixed
         {
-            //
+            return null;
         }
 
         /**
@@ -1537,7 +1724,7 @@ namespace {
          */
         final protected function isArg($argName): bool
         {
-            //
+            return false;
         }
 
         /**
@@ -1618,5 +1805,241 @@ namespace {
     class BgaUserException extends BgaVisibleSystemException
     {
         //
+    }
+
+    class Deck
+    {
+        var $autoreshuffle;
+        var $autoreshuffle_trigger; 
+
+        /**
+         * Set the databasetable name.
+         * MUST be called before any other method.
+         */
+        function init(string $table) {}
+
+        /**
+         * This is the way cards are created and should not be called during the game.
+         * Cards are added to the deck (not shuffled)
+         * Cards is an array of "card types" with at least the followin fields:
+         * array( 
+         *      array(                              // This is my first card type
+         *          "type" => "name of this type"   // Note: <10 caracters
+         *          "type_arg" => <type arg>        // Argument that should be applied to all card of this card type
+         *          "nbr" => <nbr>                  // Number of cards with this card type to create in game
+         *
+         * If location_arg is not specified, cards are placed at location extreme position
+         */
+        function createCards(array $cards, string $location = 'deck', ?int $location_arg = null) {}
+        
+        /**
+         * Get position of extreme cards (top or back) on the specific location.
+         */
+        function getExtremePosition(bool $getMax , string $location): int
+        {
+            return false;
+        }
+        
+        /**
+         * Shuffle cards of a specified location.
+         */
+        function shuffle(string $location)
+        {
+        }
+        
+        /**
+         * Pick the first card on top of specified deck and give it to specified player.
+         * Return card infos or null if no card in the specified location.
+         */
+        function pickCard(string $location, int $player_id): ?array
+        {
+            return [];
+        }
+        
+        /**
+         * Pick the "nbr" first cards on top of specified deck and give it to specified player.
+         * Return card infos (array) or null if no card in the specified location.
+         */
+        function pickCards(int $nbr, string $location, int $player_id): ?array
+        {
+            return [];
+        }
+
+        /**
+         * Pick the first card on top of specified deck and place it in target location.
+         * Return card infos or null if no card in the specified location.
+         */
+        function pickCardForLocation(string $from_location, string $to_location, int $location_arg=0 ): ?array
+        {
+            return [];
+        }
+
+        /**
+         * Pick the first "$nbr" cards on top of specified deck and place it in target location.
+         * Return cards infos or void array if no card in the specified location.
+         */
+        function pickCardsForLocation(int $nbr, string $from_location, string $to_location, int $location_arg=0, bool $no_deck_reform=false ): ?array
+        {
+            return [];
+        }
+        
+        /**
+         * Return card on top of this location.
+         */
+        function getCardOnTop(string $location): ?array
+        {
+            return [];
+        }
+
+        /**
+         * Return "$nbr" cards on top of this location.
+         */
+        function getCardsOnTop(int $nbr, string $location): ?array
+        {
+            return [];
+        }
+        
+        /**
+         * Move a card to specific location.
+         */
+        function moveCard(int $card_id, string $location, int $location_arg=0): void
+        {
+        }
+
+        /**
+         * Move cards to specific location.
+         */
+        function moveCards(array $cards, string $location, int $location_arg=0): void
+        {
+        }
+        
+        /**
+         * Move a card to a specific location where card are ordered. If location_arg place is already taken, increment
+         * all cards after location_arg in order to insert new card at this precise location.
+         */
+        function insertCard(int $card_id, string $location, int $location_arg ): void
+        {
+        }
+
+        /**
+         * Move a card on top or at bottom of given "pile" type location. (Lower numbers: bottom of the deck. Higher numbers: top of the deck.)
+         */
+        function insertCardOnExtremePosition(int $card_id, string $location, bool $bOnTop): void
+        {
+        }
+
+        /**
+         * Move all cards from a location to another.
+         * !!! location arg is reseted to 0 or specified value !!!
+         * if "from_location" and "from_location_arg" are null: move ALL cards to specific location
+         */
+        function moveAllCardsInLocation(?string $from_location, ?string $to_location, ?int $from_location_arg=null, int $to_location_arg=0 ): void
+        {
+        }
+
+        /**
+         * Move all cards from a location to another.
+         * location arg stays with the same value
+         */
+        function moveAllCardsInLocationKeepOrder(string $from_location, string $to_location): void
+        {
+        }
+        
+        /**
+         * Return all cards in specific location.
+         * note: if "order by" is used, result object is NOT indexed by card ids
+         */
+        function getCardsInLocation(string|array $location, ?int $location_arg = null, ?string $order_by = null ): array
+        {
+            return [];
+        }
+        
+        /**
+         * Get all cards in given player hand.
+         * Note: This is an alias for: getCardsInLocation( "hand", $player_id ) 
+         */
+        function getPlayerHand(int $player_id): array
+        {
+            return [];
+        }
+        
+        /**
+         * Get specific card infos
+         */ 
+        function getCard(int $card_id ): ?array
+        {
+            return [];
+        }
+        
+        /**
+         * Get specific cards infos
+         */ 
+        function getCards(array $cards_array ): array
+        {
+            return [];
+        }
+        
+        /**
+         * Get cards from their IDs (same as getCards), but with a location specified. Raises an exception if the cards are not in the specified location.
+         */
+        function getCardsFromLocation(array $cards_array, string $location, ?int $location_arg = null ): array
+        {
+            return [];
+        }
+        
+        /**
+         * Get card of a specific type.
+         */
+        function getCardsOfType(mixed $type, ?int $type_arg=null ): array
+        {
+            return [];
+        }
+        
+        /**
+         * Get cards of a specific type in a specific location.
+         */
+        function getCardsOfTypeInLocation(mixed $type, ?int $type_arg=null, string $location, ?int $location_arg = null ): array
+        {
+            return [];
+        }
+        
+        /**
+         * Move a card to discard pile.
+         */
+        function playCard(int $card_id): void
+        {
+        }
+        
+        /**
+         * Return the number of cards in specified location. 
+         */
+        function countCardInLocation(string $location, ?int $location_arg=null): int|string
+        {
+            return '0';
+        }
+        
+        /**
+         * Return the number of cards in specified location. 
+         */
+        function countCardsInLocation(string $location, ?int $location_arg=null): int|string
+        {
+            return '0';
+        }
+        
+        /**
+         * Return an array "location" => number of cards.
+         */
+        function countCardsInLocations(): array
+        {
+            return [];
+        }
+        
+        /**
+         * Return an array "location_arg" => number of cards (for this location).
+         */
+        function countCardsByLocationArgs(string $location): array
+        {
+            return [];
+        }
     }
 }

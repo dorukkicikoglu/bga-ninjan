@@ -292,7 +292,7 @@ body.mobile_version{
 .mobile_version .a-game-log.selected-cards-log.roundedbox{ margin-left: 20px; margin-right: 20px; padding: 5px 14px 3px 14px; }
 
 .log-arrow{ font-size: 20px; vertical-align: middle; margin-top: -3px; display: inline-block; 
-	&.log-arrow-left{ font-weight: bold; color: #5aaa0e; font-size: 30px; width: 18px; margin-right: -2px; margin-left: -2px; height: 20px; line-height: 17px; overflow-x: hidden; overflow-y: clip; margin-top: 1px; vertical-align: middle; }
+	&.log-arrow-left{ color: #35b935; }
 	&.log-arrow-right{ color: #000 !important; }
 	&.place-under-icon{ color: var(--place-under-log-color); font-size: 18px; }
 }

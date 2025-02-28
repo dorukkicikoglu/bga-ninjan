@@ -1,6 +1,8 @@
 <?php
 
 class NJNPileManager extends APP_DbObject{
+    public $parent;
+
     function __construct($parent) {
         $this->parent = $parent;
     }

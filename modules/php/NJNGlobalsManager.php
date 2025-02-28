@@ -1,6 +1,10 @@
 <?php
 
 class NJNGlobalsManager extends APP_DbObject{
+    public $parent;
+    private $globalKeys;
+    public $userPrefs;
+    
     function __construct($parent, $globalKeys, $userPrefs = []) {
         $this->parent = $parent;
         $this->globalKeys = $globalKeys;
