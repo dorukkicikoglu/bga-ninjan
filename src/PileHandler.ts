@@ -23,7 +23,17 @@ class PileHandler{
                 dojo.place(dojo.create('div', {class: 'a-card', suit: cardData.suit, rank: cardData.rank, 'card-id': cardData.card_id}), pileContainer);
 
             this.pileContainers[pileIndex] = pileContainer;
+            this.addPileSumText(Number(pileIndex));
         }
+    }
+
+    private addPileSumText(pileIndex: number): void {
+        let pileContainer = this.pileContainers[pileIndex];
+        let pileCardCount = this.pilesData[pileIndex].length;
+        let pileSum:number = this.pilesData[pileIndex].reduce((sum, cardData) => sum + Number(cardData.rank), 0);
+        
+        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 3 ? 'true' : 'false');
+        pileContainer.style.setProperty('--pile-card-count', '"' + pileSum + '"');
     }
 
     private fillPileQueue(): void {
@@ -298,7 +308,7 @@ class PileHandler{
                 delay: 200,
                 duration: 500,
                 easing: 'sineIn',
-                onEnd: () => { this.pilesContainer.style.zIndex = null; }
+                onEnd: () => { this.addPileSumText(pileIndex); this.pilesContainer.style.zIndex = null; }
             }) :
             this.gameui.animationHandler.animateProperty({ //slide zombie card off screen
                 node: newPileCard,
