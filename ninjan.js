@@ -931,7 +931,15 @@ var PileHandler = /** @class */ (function () {
                 dojo.place(dojo.create('div', { class: 'a-card', suit: cardData.suit, rank: cardData.rank, 'card-id': cardData.card_id }), pileContainer);
             }
             this.pileContainers[pileIndex] = pileContainer;
+            this.addPileSumText(Number(pileIndex));
         }
+    };
+    PileHandler.prototype.addPileSumText = function (pileIndex) {
+        var pileContainer = this.pileContainers[pileIndex];
+        var pileCardCount = this.pilesData[pileIndex].length;
+        var pileSum = this.pilesData[pileIndex].reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
+        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 3 ? 'true' : 'false');
+        pileContainer.style.setProperty('--pile-card-count', '"' + pileSum + '"');
     };
     PileHandler.prototype.fillPileQueue = function () {
         var wrapper = dojo.query('.remaining-cards-wrapper', this.pileQueueContainer)[0];
@@ -1152,7 +1160,7 @@ var PileHandler = /** @class */ (function () {
                 delay: 200,
                 duration: 500,
                 easing: 'sineIn',
-                onEnd: function () { _this.pilesContainer.style.zIndex = null; }
+                onEnd: function () { _this.addPileSumText(pileIndex); _this.pilesContainer.style.zIndex = null; }
             }) :
             this.gameui.animationHandler.animateProperty({
                 node: newPileCard,

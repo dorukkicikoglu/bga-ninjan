@@ -19,7 +19,7 @@ body.mobile_version{ background-size: 200%; }
 
 @mixin text-shadow-1-white() { text-shadow: 1px 0 #f0f0f0, -1px 0 #f0f0f0, 0 1px #f0f0f0, 0 -1px #f0f0f0, 0.5px 0.5px #f0f0f0, -0.5px -0.5px #f0f0f0, 0.5px -0.5px #f0f0f0, -0.5px 0.5px #f0f0f0; }
 @mixin text-shadow-2-white() { text-shadow: 2px 0 #f0f0f0, -2px 0 #f0f0f0, 0 2px #f0f0f0, 0 -2px #f0f0f0, 1px 1px #f0f0f0, -1px -1px #f0f0f0, 1px -1px #f0f0f0, -1px 1px #f0f0f0; }
-@mixin text-shade($color, $size) { text-shadow: $size 0 $color, -$size 0 $color, 0 $size $color, 0 -$size $color, ($size / 2) ($size / 2) $color, -($size / 2) -($size / 2) $color, ($size / 2) -($size / 2) $color, -($size / 2) ($size / 2) $color; }
+@mixin text-shade($color, $size) { text-shadow: #{$size} 0 $color, -#{$size} 0 $color, 0 #{$size} $color, 0 -#{$size} $color, #{($size / 2)} #{($size / 2)} $color, -#{($size / 2)} -#{($size / 2)} $color, #{($size / 2)} -#{($size / 2)} $color, -#{($size / 2)} #{($size / 2)} $color; }
 @mixin non-selectable() { -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
 
 .capitalize-first{display: inline-block; &:first-letter { text-transform: uppercase; }}
@@ -186,9 +186,12 @@ body.mobile_version{
 		.pile-queue-container{ display: inline-block; }
 	}
 	.piles-container{ display: inline-block; vertical-align: top; min-height: calc(var(--card-width)* 2);
-		.a-pile-container{ position: relative; display: inline-block; width: var(--card-width); vertical-align: top; margin: 9px calc(var(--card-width) * 0.06); border-radius: calc(var(--card-width) * 0.1); min-height: calc(var(--card-width)* 2);
+		.a-pile-container{ position: relative; display: inline-block; width: var(--card-width); vertical-align: top; margin: 9px calc(var(--card-width) * 0.06); border-radius: calc(var(--card-width) * 0.1); min-height: calc(var(--card-width) * 2);
 			.a-card:not(:first-of-type){ margin-top: calc(var(--card-width) * -1.44); }
-			.place-under-icon{ opacity: 0; color: var(--place-under-arrow-color); animation: hopping-place-under-icon 2.2s ease-in-out infinite; position: absolute; top: calc(var(--card-width)* -0.008); left: calc(var(--card-width)* 0.34); width: calc(var(--card-width)* 0.3); font-size: calc(var(--card-width)* 0.24); @include text-shadow-2-white(); @include non-selectable(); transition: opacity 0.3s;} }
+			.place-under-icon{ opacity: 0; color: var(--place-under-arrow-color); animation: hopping-place-under-icon 2.2s ease-in-out infinite; position: absolute; top: calc(var(--card-width)* -0.008); left: calc(var(--card-width)* 0.34); width: calc(var(--card-width)* 0.3); font-size: calc(var(--card-width)* 0.24); @include text-shadow-2-white(); @include non-selectable(); transition: opacity 0.3s;} 
+			&:after{ opacity: 0; transition: opacity 0.3s; @include non-selectable(); content: var(--pile-card-count); position: absolute; bottom: calc(var(--card-width) * 1.5); text-align: center; left: 50%; transform: translateX(-50%); background: var(--bg-gradient-light); border-radius: 24%; width: calc(var(--card-width) * 0.28); height: calc(var(--card-width) * 0.28); line-height: calc(var(--card-width) * 0.29); font-size: calc(var(--card-width) * 0.2); @include text-shade(#555, 1px); color: #FFF; }
+			&[pile-sum-visible="true"]::after{ opacity: 1; }
+		}
 	}
 }
 .place-under-icon{ transform: rotate(90deg); }
