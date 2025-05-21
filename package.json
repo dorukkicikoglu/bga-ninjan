@@ -1,0 +1,35 @@
+{
+  "name": "ninjan",
+  "version": "1.0.0",
+  "description": "A BGA implementation of Ninjan",
+  "main": "ninjan.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch:ts": "tsc --watch",
+    "watch:scss": "sass --watch src/ninjan.scss:ninjan.css",
+    "watch": "concurrently \"npm run watch:ts\" \"npm run watch:scss\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dorukkicikoglu/bga-ninjan.git"
+  },
+  "keywords": [
+    "bga",
+    "board",
+    "game",
+    "ninjan",
+    "digital",
+    "board",
+    "game",
+    "adaptation"
+  ],
+  "author": "Doruk Kicikoglu",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/dorukkicikoglu/bga-ninjan/issues"
+  },
+  "homepage": "https://github.com/dorukkicikoglu/bga-ninjan#readme",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

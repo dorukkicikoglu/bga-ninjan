@@ -32,7 +32,7 @@ class PileHandler{
         let pileCardCount = this.pilesData[pileIndex].length;
         let pileSum:number = this.pilesData[pileIndex].reduce((sum, cardData) => sum + Number(cardData.rank), 0);
         
-        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 3 ? 'true' : 'false');
+        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 2 ? 'true' : 'false');
         pileContainer.style.setProperty('--pile-card-count', '"' + pileSum + '"');
     }
 

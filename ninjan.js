@@ -938,7 +938,7 @@ var PileHandler = /** @class */ (function () {
         var pileContainer = this.pileContainers[pileIndex];
         var pileCardCount = this.pilesData[pileIndex].length;
         var pileSum = this.pilesData[pileIndex].reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
-        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 3 ? 'true' : 'false');
+        dojo.attr(pileContainer, 'pile-sum-visible', pileCardCount >= 2 ? 'true' : 'false');
         pileContainer.style.setProperty('--pile-card-count', '"' + pileSum + '"');
     };
     PileHandler.prototype.fillPileQueue = function () {

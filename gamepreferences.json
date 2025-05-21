@@ -48,5 +48,23 @@
             }
         },
         "default": 1
+    },
+    "111":
+    {
+        "name": "Red background",
+        "values":
+        {
+            "1":
+            {
+                "name": "High",
+                "cssPref": "red-background-high"
+            },
+            "2":
+            {
+                "name": "Low",
+                "cssPref": "red-background-low"
+            }
+        },
+        "default": 1
     }
 }
