@@ -3,9 +3,9 @@ body { background-image: none; background-attachment: fixed; background: var(--p
 	--remaining-cards-background: linear-gradient(to right, rgba(221, 81, 60, 0.2), #c32c16A0 calc(100% - (var(--card-width) + 37px)), rgba(221, 81, 60, 0) calc(100% - 5px));
 }
 
-.red-background-low body, body.red-background-low { 
-	--page-background-color: linear-gradient(180deg, #c43323 0%, #52130d 78%, #c43323);
-	--remaining-cards-background: linear-gradient(to right, rgba(221, 81, 60, 0.2), #9e3222a0 calc(100% - (var(--card-width) + 37px)), rgba(221, 81, 60, 0) calc(100% - 5px));
+.dark-background-on body, body.dark-background-on { 
+	--page-background-color: linear-gradient(180deg, #c43323, #52130d 85%, #7d3a33);
+	--remaining-cards-background: linear-gradient(to right, rgb(129 33 22 / 7%), #9e322290 calc(100% - (var(--card-width) + 37px)), rgba(221, 81, 60, 0) calc(100% - 5px));
 }
 
 body.desktop_version{ background-size: 100%; }
@@ -38,7 +38,7 @@ body.mobile_version{ background-size: 200%; }
 	.dijitTooltipContainer{ width: 240px; font-size: 20px; }
 }
 
-.player-board { background-color: #ebd5bdf0; 
+.player-board { background: linear-gradient(116deg, #e8c8a0e0 70%, rgba(255, 228, 139, 0.34));
 	&.board-bounce{ animation: bouncing-player-board 0.175s ease-in-out 2; }
 }
 

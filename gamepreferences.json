@@ -51,18 +51,18 @@
     },
     "111":
     {
-        "name": "Red background",
+        "name": "Dark background",
         "values":
         {
             "1":
             {
-                "name": "High",
-                "cssPref": "red-background-high"
+                "name": "On",
+                "cssPref": "dark-background-on"
             },
             "2":
             {
-                "name": "Low",
-                "cssPref": "red-background-low"
+                "name": "Off",
+                "cssPref": "dark-background-off"
             }
         },
         "default": 1
