@@ -203,6 +203,9 @@ var GameBody = /** @class */ (function (_super) {
     }
     GameBody.prototype.setup = function (gamedatas) {
         console.log("Starting game setup");
+        var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isSafari)
+            document.body.classList.add('safari-browser');
         this.imageLoader = new ImageLoadHandler(this, ['ninjan-cards', 'bg-front']);
         this.animationHandler = new AnimationHandler(this);
         this.prefHandler = new PrefHandler(this, gamedatas.pref_names);
@@ -235,6 +238,8 @@ var GameBody = /** @class */ (function (_super) {
         console.log('Entering state: ' + stateName, args);
         switch (stateName) {
             case 'selectCard':
+                if (!args.args._private)
+                    return;
                 if (!args.args._private.autoPlay && !args.args._private.selected_card_id)
                     this.showRefCard();
                 if (this.myself)
@@ -1347,6 +1352,24 @@ var TooltipHandler = /** @class */ (function () {
     }
     TooltipHandler.prototype.addTooltipToCards = function () {
         var _this = this;
+        if (document.body.classList.contains('safari-browser') && this.gameui.isMobile()) {
+            this.addTooltipToBottomForSafari();
+            return;
+        }
+        var tooltipHTML = this.getTooltipHTML();
+        dojo.query('.a-card').forEach(function (node) {
+            var cardID = 'card-id-' + dojo.attr(node, 'card-id');
+            dojo.attr(node, 'id', cardID);
+            _this.gameui.addTooltipHtml(cardID, tooltipHTML, _this.gameui.isDesktop() ? 600 : 0);
+        });
+    };
+    TooltipHandler.prototype.addTooltipToBottomForSafari = function () {
+        if (!document.body.classList.contains('safari-browser') || !this.gameui.isMobile())
+            return;
+        var tooltipHTML = this.getTooltipHTML();
+        document.querySelector('.safari-mobile-revealed-cards-container').innerHTML = tooltipHTML;
+    };
+    TooltipHandler.prototype.getTooltipHTML = function () {
         var suitRowsHTML = '';
         for (var suit in this.playedCards) {
             var suitCards = Object.values(this.playedCards[suit]); //convert dict to array for sorting
@@ -1354,11 +1377,7 @@ var TooltipHandler = /** @class */ (function () {
             suitRowsHTML += '<div class="suit-row">' + this.gameui.createCardIcons(suitCards) + '</div>';
         }
         var tooltipHTML = dojo.string.substitute(this.gameui.jstpl_tooltip_wrapper, { suit_rows: suitRowsHTML, tooltip_title: _('Cards Revealed') });
-        dojo.query('.a-card').forEach(function (node) {
-            var cardID = 'card-id-' + dojo.attr(node, 'card-id');
-            dojo.attr(node, 'id', cardID);
-            _this.gameui.addTooltipHtml(cardID, tooltipHTML, _this.gameui.isDesktop() ? 600 : 0);
-        });
+        return tooltipHTML;
     };
     TooltipHandler.prototype.addNewPlayedCard = function (newPlayedCardsData) {
         for (var _i = 0, newPlayedCardsData_1 = newPlayedCardsData; _i < newPlayedCardsData_1.length; _i++) {

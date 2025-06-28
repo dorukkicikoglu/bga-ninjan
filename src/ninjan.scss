@@ -262,18 +262,18 @@ body.mobile_version{
 
 .dijitTooltipContainer{
 	&:has(.tooltip-wrapper){ background: none; }
-  .tooltip-wrapper{ max-width: 390px; background: var(--bg-gradient-tooltip); padding: 10px; margin: -6px -6px -6px -6px;
-  	.tooltip-title{ font-size: 20px; color: #070031d9; font-weight: bold; @include text-shade(#ffcae7e0, 2px); text-indent: 6px; }
-    .suits-container{ margin-top: 14px; margin-bottom: -14px;
-    	.suit-row{ position: relative; margin-bottom: 12px;
-			&:after{ position: absolute; left: 5%; bottom: -2px; content: ""; width: 90%; height: 0.4px; background-color: #6f1f13; display: block; }
-			&:last-of-type::after{ display: none; }
-			.a-card-icon{ --card-icon-width: 60px; margin-bottom: 7px;
-				&:before{ width: calc(var(--card-icon-width)* 0.5); margin-right: calc(var(--card-icon-width)* 0.57); text-align: center; }
-				&:after{ width: calc(var(--card-icon-width)* 0.62); height: calc(var(--card-icon-width)* 0.56); }
-			}
-    	}
-    }
+}
+.tooltip-wrapper{ max-width: 390px; background: var(--bg-gradient-tooltip); padding: 10px; margin: -6px -6px -6px -6px;
+	.tooltip-title{ font-size: 20px; color: #070031d9; font-weight: bold; @include text-shade(#ffcae7e0, 2px); text-indent: 6px; }
+  .suits-container{ margin-top: 14px; margin-bottom: -14px;
+	  .suit-row{ position: relative; margin-bottom: 12px;
+		  &:after{ position: absolute; left: 5%; bottom: -2px; content: ""; width: 90%; height: 0.4px; background-color: #6f1f13; display: block; }
+		  &:last-of-type::after{ display: none; }
+		  .a-card-icon{ --card-icon-width: 60px; margin-bottom: 7px;
+			  &:before{ width: calc(var(--card-icon-width)* 0.5); margin-right: calc(var(--card-icon-width)* 0.57); text-align: center; }
+			  &:after{ width: calc(var(--card-icon-width)* 0.62); height: calc(var(--card-icon-width)* 0.56); }
+		  }
+	  }
   }
 }
 .tundra:has(.tooltip-wrapper){ /* to change the color of the little tooltip arrow */
@@ -295,6 +295,13 @@ body.mobile_version{
 				.a-card-icon{ --card-icon-width: 40px; }
 			}
 		}
+	}
+}
+
+.safari-mobile-revealed-cards-container{ display: none; }
+.mobile_version.safari-browser #page-content{ min-height: 270vh;
+	.safari-mobile-revealed-cards-container{ display: block; background: var(--bg-gradient-tooltip); padding: 10px; width: 390px; margin: auto; margin-top: 80vh; 
+		.tooltip-wrapper{ max-width: unset; }
 	}
 }
 

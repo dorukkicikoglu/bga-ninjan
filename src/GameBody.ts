@@ -30,6 +30,11 @@ class GameBody extends GameGui {
      
     public setup(gamedatas: any) {
         console.log( "Starting game setup" );
+
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if(isSafari)
+            document.body.classList.add('safari-browser');
+
         this.imageLoader = new ImageLoadHandler(this, ['ninjan-cards', 'bg-front']);
 
         this.animationHandler = new AnimationHandler(this);
@@ -76,6 +81,9 @@ class GameBody extends GameGui {
         switch( stateName )
         {
             case 'selectCard':
+                if(!args.args._private)
+                    return;
+
                 if(!args.args._private.autoPlay && !args.args._private.selected_card_id)
                     this.showRefCard();
 

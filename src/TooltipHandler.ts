@@ -7,6 +7,30 @@ class TooltipHandler{
 	}
 
 	public addTooltipToCards(){
+        if(document.body.classList.contains('safari-browser') && this.gameui.isMobile()) {
+            this.addTooltipToBottomForSafari();
+            return;
+        }
+        const tooltipHTML = this.getTooltipHTML();
+
+        dojo.query('.a-card').forEach((node) => {
+            let cardID = 'card-id-' + dojo.attr(node, 'card-id');
+            dojo.attr(node, 'id', cardID);
+
+            this.gameui.addTooltipHtml(cardID, tooltipHTML, this.gameui.isDesktop() ? 600 : 0);
+        });
+    }
+
+    private addTooltipToBottomForSafari(){
+        if(!document.body.classList.contains('safari-browser') || !this.gameui.isMobile())
+            return;
+
+        const tooltipHTML = this.getTooltipHTML();
+
+        document.querySelector('.safari-mobile-revealed-cards-container').innerHTML = tooltipHTML;
+    }
+
+    private getTooltipHTML(): string {
         let suitRowsHTML = '';
 
         for(let suit in this.playedCards){
@@ -17,13 +41,7 @@ class TooltipHandler{
         }
 
         let tooltipHTML = dojo.string.substitute(this.gameui.jstpl_tooltip_wrapper, {suit_rows: suitRowsHTML, tooltip_title: _('Cards Revealed')});
-
-        dojo.query('.a-card').forEach((node) => {
-            let cardID = 'card-id-' + dojo.attr(node, 'card-id');
-            dojo.attr(node, 'id', cardID);
-
-            this.gameui.addTooltipHtml(cardID, tooltipHTML, this.gameui.isDesktop() ? 600 : 0);
-        });
+        return tooltipHTML;
     }
 
     public addNewPlayedCard(newPlayedCardsData){ 

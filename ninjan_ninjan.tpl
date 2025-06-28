@@ -45,6 +45,8 @@
     <div class="piles-container"></div>
 </div>
 
+<div class="safari-mobile-revealed-cards-container"></div>
+
 <script type="text/javascript">
 
 </script>  
