@@ -16,7 +16,8 @@
  */
 declare(strict_types=1);
 
-require_once(APP_GAMEMODULE_PATH . "module/table/table.game.php");
+use Bga\GameFramework\Components\Deck;
+use Bga\GameFramework\Table;
 
 require_once ('modules/php/NJNGlobalsManager.php');
 require_once ('modules/php/NJNHandManager.php');
@@ -26,7 +27,7 @@ require_once ('modules/php/NJNPileManager.php');
 class Ninjan extends Table
 {
     public NJNGlobalsManager $globalsManager;
-    public $cardsDeck;
+    public Deck $cardsDeck;
     public NJNHandManager $handManager;
     public NJNTableManager $tableManager;
     public NJNPileManager $pileManager;
@@ -54,8 +55,7 @@ class Ninjan extends Table
             )
         );
         
-        $this->cardsDeck = self::getNew("module.common.deck");
-        $this->cardsDeck->init("cards");
+        $this->cardsDeck = $this->deckFactory->createDeck("cards");
 
         $this->handManager = new NJNHandManager($this);
         $this->tableManager = new NJNTableManager($this);
@@ -239,12 +239,12 @@ class Ninjan extends Table
      */
     public function getGameProgression()
     {
-        $playerCount = $this->getPlayersNumber(true);
+        $playerCount = $this->customGetPlayersNumber(true);
         $playerCardsCount = $this->tableManager->getRemainingPlayerCardsCount();
         $totalCardsCount = HAND_SIZE * $playerCount;
         $progression = ($totalCardsCount - $playerCardsCount) / $totalCardsCount;
 
-        if($this->gamestate->state()['name'] == 'takePile'){
+        if($this->gamestate->getCurrentMainState()->name == 'takePile'){
             $pileQueueCount = $this->pileManager->getPileQueueCount();
             if($pileQueueCount > 0){
                 $pileQueueProgression = ($playerCount - $pileQueueCount) / $playerCount;
@@ -283,7 +283,7 @@ class Ninjan extends Table
 
         foreach($pileQueue as $index => $cardData){
             $this->incStat(($index + 1) / HAND_SIZE, 'avg_ranking_revealed_cards', (int) $cardData['owner_id']);
-            $this->incStat(($index + 1) / (HAND_SIZE * $this->getPlayersNumber()), 'avg_ranking_revealed_cards_divide_num_players', (int) $cardData['owner_id']);
+            $this->incStat(($index + 1) / (HAND_SIZE * $this->customGetPlayersNumber()), 'avg_ranking_revealed_cards_divide_num_players', (int) $cardData['owner_id']);
         }
 
         $cardsDataStr = []; //needed for the game replay page
@@ -413,16 +413,6 @@ class Ninjan extends Table
     }
 
     /**
-     * Returns the game name.
-     *
-     * IMPORTANT: Please do not modify.
-     */
-    protected function getGameName()
-    {
-        return "ninjan";
-    }
-
-    /**
      * This method is called only once, when a new game is launched. In this method, you must setup the game
      *  according to the game rules, so that the game is ready to be played.
      */
@@ -482,6 +472,8 @@ class Ninjan extends Table
         self::DbQuery("INSERT INTO cards (card_id, card_type, card_type_arg, card_location, card_location_arg, suit, rank) VALUES ".implode(',', $cardRows)); 
 
         $this->tableManager->shuffleAndDealCards();
+
+        return 2;
     }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -495,10 +487,10 @@ class Ninjan extends Table
         self::DbQuery("UPDATE player SET sort_cards_by = '$sortBy' WHERE player_id = $current_player_id");
     }
 
-    function getPlayersNumber($noZombies = false) {
+    function customGetPlayersNumber($noZombies = false) {
         if ($noZombies)
             return (int) $this->getUniqueValueFromDB("SELECT count(*) as count FROM player WHERE player_zombie = 0");
-        return parent::getPlayersNumber();
+        return $this->getPlayersNumber();
     }
 
     function zombifyCardsIfNeeded(){

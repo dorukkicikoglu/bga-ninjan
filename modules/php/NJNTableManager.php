@@ -70,7 +70,7 @@ class NJNTableManager extends APP_DbObject{
     }
 
     function getRemainingPlayerCardsCount(){ return (int) $this->getUniqueValueFromDB("SELECT count(*) FROM cards WHERE card_location = 'player'"); }
-    function isLastCards(){ return $this->getRemainingPlayerCardsCount() <= $this->parent->getPlayersNumber(true); }
+    function isLastCards(){ return $this->getRemainingPlayerCardsCount() <= $this->parent->customGetPlayersNumber(true); }
     function arePlayerCardsFinished(){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM cards WHERE card_location = 'player') AS exists_in_player") == 0; }
     function anyPilesTaken($playerID = false){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM cards WHERE card_location = 'scored'".($playerID ? " AND card_location_arg = $playerID" : "").") AS exists_scored_card") != 0; }
     function getPlayedCards(){ return $this->getDoubleKeyCollectionFromDB("SELECT suit, rank, card_id FROM cards WHERE card_location IN('pile', 'pile_queue', 'scored')", false); }

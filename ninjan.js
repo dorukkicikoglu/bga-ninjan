@@ -1298,10 +1298,9 @@ var PrefHandler = /** @class */ (function () {
         var _this = this;
         this.gameui = gameui;
         this.prefNameToIndex = prefNameToIndex;
-        this.gameui.onGameUserPreferenceChanged = function (prefIndex, prefValue) { _this.onGameUserPreferenceChanged(prefIndex, prefValue); };
+        this.gameui.bga.userPreferences.onChange = function (prefIndex, prefValue) { _this.onGameUserPreferenceChanged(prefIndex, prefValue); };
     }
     PrefHandler.prototype.onGameUserPreferenceChanged = function (prefIndex, prefValue) {
-        this.gameui.prefs[prefIndex].value = prefValue.toString();
         switch (prefIndex) {
             case 110:
                 this.gameui.backgroundHandler.flyingCharactersPreferenceChanged(parseInt(prefValue) == 1);
@@ -1315,32 +1314,11 @@ var PrefHandler = /** @class */ (function () {
                 break;
         }
     };
-    PrefHandler.prototype.getNumericPrefIndex = function (prefIndex) {
-        if (this.gameui.prefs.hasOwnProperty(prefIndex))
-            return prefIndex;
-        else if (this.prefNameToIndex.hasOwnProperty(prefIndex))
-            return this.prefNameToIndex[prefIndex];
-        return null;
-    };
     PrefHandler.prototype.setPref = function (prefIndex, newValue) {
-        prefIndex = this.getNumericPrefIndex(prefIndex);
-        var optionSel = 'option[value="' + newValue + '"]';
-        dojo.query('#preference_control_' + prefIndex + ' > ' + optionSel + ', #preference_fontrol_' + prefIndex + ' > ' + optionSel).attr('selected', true);
-        this.gameui.prefs[prefIndex].value = newValue.toString();
-        var select = $('preference_control_' + prefIndex);
-        if (dojo.isIE)
-            select.fireEvent('onchange');
-        else {
-            var event_1 = document.createEvent('HTMLEvents');
-            event_1.initEvent('change', false, true);
-            select.dispatchEvent(event_1);
-        }
+        this.gameui.bga.userPreferences.set(prefIndex, newValue);
     };
     PrefHandler.prototype.getPref = function (prefIndex) {
-        prefIndex = this.getNumericPrefIndex(prefIndex);
-        if (prefIndex === null)
-            return null;
-        return parseInt(this.gameui.prefs[prefIndex].value);
+        return this.gameui.bga.userPreferences.get(prefIndex);
     };
     return PrefHandler;
 }());

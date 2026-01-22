@@ -12,6 +12,14 @@ declare const dojo;
 declare const $;
 declare const dijit;
 
+declare class Bga {
+    userPreferences: {
+        onChange: (prefIndex: number, prefValue: string | number) => void;
+        set(prefIndex: number, newValue: string | number): void;
+        get(prefIndex: number): string | number;
+    };
+}
+
 declare class GameGui {
     page_is_unloading: any;
     game_name: string;

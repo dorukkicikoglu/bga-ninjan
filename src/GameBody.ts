@@ -6,6 +6,7 @@ GameGui = (function () { // this hack required so we fake extend GameGui
 
 // Note: it does not really extend it in es6 way, you cannot call super you have to use dojo way 
 class GameBody extends GameGui { 
+    public bga: Bga;
     private imageLoader: ImageLoadHandler;
     public animationHandler: AnimationHandler;
     public players: Record<number, PlayerHandler> = {};

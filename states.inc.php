@@ -51,19 +51,6 @@
 
 
 $machinestates = [
-
-    // The initial state. Please do not modify.
-
-    1 => array(
-        "name" => "gameSetup",
-        "description" => "",
-        "type" => "manager",
-        "action" => "stGameSetup",
-        "transitions" => ["" => 2]
-    ),
-
-    // Note: ID=2 => your first state
-
     2 => [
         "name" => "selectCard",
         "description" => clienttranslate('Waiting for players to select a card'),
@@ -103,18 +90,6 @@ $machinestates = [
         "action" => "stNextPlayer",
         "transitions" => array( "takePile" => 4, "selectCard" => 2, "gameEnd" => 99 )
     ],
-
-    // Final state.
-    // Please do not modify (and do not overload action/args methods).
-    99 => [
-        "name" => "gameEnd",
-        "description" => clienttranslate("End of game"),
-        "type" => "manager",
-        "action" => "stGameEnd",
-        "args" => "argGameEnd",
-        "updateGameProgression" => true,
-    ],
-
 ];
 
 
