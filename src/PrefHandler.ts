@@ -24,7 +24,16 @@ class PrefHandler{
     }
 
     public getPref(prefIndex) {
-        return this.gameui.bga.userPreferences.get(prefIndex);
+        let prefIndexNum = prefIndex;
+        if (typeof prefIndex === "string" && !/^\d+$/.test(prefIndex)) {
+            if (!this.prefNameToIndex.hasOwnProperty(prefIndex)) {
+                console.error('Pref index not found', prefIndex);
+                return null;
+            }
+            prefIndexNum = this.prefNameToIndex[prefIndex];
+        }
+
+        return this.gameui.bga.userPreferences.get(prefIndexNum);
     }
 }
 
