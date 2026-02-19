@@ -73,21 +73,21 @@ class Ninjan extends Table
 
         $currentPlayerID = $autoPlay_playerID ? $autoPlay_playerID : (int) $this->getCurrentPlayerId();
 
-        $cardBelongsToMe = $this->getUniqueValueFromDB("SELECT card_id FROM cards WHERE card_id = $cardID AND card_location = 'player' AND card_location_arg = $currentPlayerID");
+        $cardBelongsToMe = $this->getUniqueValueFromDB("SELECT `card_id` FROM `cards` WHERE `card_id` = $cardID AND `card_location` = 'player' AND `card_location_arg` = $currentPlayerID");
         if(!$cardBelongsToMe)
             throw new BgaUserException(_("Invalid card selected"));
 
         $this->zombifyCardsIfNeeded();
 
         if(!$preSelection){
-            $madeSelectionThisRound = $this->getUniqueValueFromDB("SELECT made_card_selection_this_round FROM player WHERE player_id = $currentPlayerID");
+            $madeSelectionThisRound = $this->getUniqueValueFromDB("SELECT `made_card_selection_this_round` FROM `player` WHERE `player_id` = $currentPlayerID");
 
             if($madeSelectionThisRound == 'false')
                 $this->giveExtraTime($currentPlayerID);
             else $this->not_a_move_notification = true; // note: do not increase the move counter
         
-            self::DbQuery("UPDATE player SET selected_card_id = $cardID, made_card_selection_this_round = 'true' WHERE player_id = $currentPlayerID");
-        } else self::DbQuery("UPDATE player SET pre_selected_card_id = $cardID WHERE player_id = $currentPlayerID");
+            self::DbQuery("UPDATE `player` SET `selected_card_id` = $cardID, `made_card_selection_this_round` = 'true' WHERE `player_id` = $currentPlayerID");
+        } else self::DbQuery("UPDATE `player` SET `pre_selected_card_id` = $cardID WHERE `player_id` = $currentPlayerID");
 
         $this->notifyPlayer($currentPlayerID, 'notif_cardSelectionConfirmed', '', ['confirmed_selected_card_id' => $cardID, 'pre_selection' => $preSelection]);
         
@@ -101,7 +101,7 @@ class Ninjan extends Table
 
         $currentPlayerID = (int) $this->getCurrentPlayerId();
 
-        self::DbQuery("UPDATE player SET ".(!$preSelection ? 'selected_card_id' : 'pre_selected_card_id')." = NULL WHERE player_id = $currentPlayerID");
+        self::DbQuery("UPDATE `player` SET ".(!$preSelection ? '`selected_card_id`' : '`pre_selected_card_id`')." = NULL WHERE `player_id` = $currentPlayerID");
 
         if(!$preSelection)
             $this->gamestate->setPlayersMultiactive([$currentPlayerID], '');
@@ -126,16 +126,16 @@ class Ninjan extends Table
         $selectedCard = $this->handManager->getPlayerSelectedCard($activePlayerID);
 
         $selectedCardID = $selectedCard['card_id'];
-        $pileCards = $this->pileManager->getPile($pileIndex, ' ORDER BY rank DESC, suit');
+        $pileCards = $this->pileManager->getPile($pileIndex, ' ORDER BY `rank` DESC, `suit`');
         $newScore = 'no_change';
 
         if($possiblePiles['reason'] == 'take'){
             $firstTakenPileOfGame = !$this->tableManager->anyPilesTaken();
             $firstTakenPileByPlayer = !$this->tableManager->anyPilesTaken($playerID = $activePlayerID);
 
-            self::DbQuery("UPDATE cards SET card_location = 'scored', card_location_arg = $activePlayerID WHERE card_location = 'pile' AND card_location_arg = $pileIndex");
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'scored', `card_location_arg` = $activePlayerID WHERE `card_location` = 'pile' AND `card_location_arg` = $pileIndex");
             $newScore = $this->handManager->updatePlayerScore($activePlayerID);
-            self::DbQuery("UPDATE cards SET card_location = 'pile', card_location_arg = $pileIndex, location_on_pile = 0 WHERE card_id = $selectedCardID");
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'pile', `card_location_arg` = $pileIndex, `location_on_pile` = 0 WHERE `card_id` = $selectedCardID");
 
             $this->incStat(count($pileCards), 'cards_taken', $activePlayerID);
             $this->incStat(1, 'piles_taken', $activePlayerID);
@@ -158,13 +158,13 @@ class Ninjan extends Table
                 $this->setStat(min($pileSum, $this->getStat('lowest_point_from_pile', $activePlayerID)), 'lowest_point_from_pile', $activePlayerID);
             }
         } else {
-            $newLocationOnPile = 1 + (int) $this->getUniqueValueFromDB("SELECT IFNULL(MAX(location_on_pile), 0) FROM cards WHERE card_location = 'pile' AND card_location_arg = $pileIndex");
+            $newLocationOnPile = 1 + (int) $this->getUniqueValueFromDB("SELECT IFNULL(MAX(`location_on_pile`), 0) FROM `cards` WHERE `card_location` = 'pile' AND `card_location_arg` = $pileIndex");
             $this->setStat(max($newLocationOnPile + 1, $this->getStat('max_card_on_a_pile')), 'max_card_on_a_pile');
             
-            self::DbQuery("UPDATE cards SET card_location = 'pile', card_location_arg = $pileIndex, location_on_pile = $newLocationOnPile WHERE card_id = $selectedCardID");
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'pile', `card_location_arg` = $pileIndex, `location_on_pile` = $newLocationOnPile WHERE `card_id` = $selectedCardID");
         }
 
-        self::DbQuery("UPDATE player SET selected_card_id = NULL WHERE player_id = $activePlayerID");
+        self::DbQuery("UPDATE `player` SET `selected_card_id` = NULL WHERE `player_id` = $activePlayerID");
 
         if(!$autoPlay)
             $this->giveExtraTime($activePlayerID);
@@ -206,7 +206,7 @@ class Ninjan extends Table
     
     public function argSelectCard(): array
     {
-        $selectedCardIDs = $this->getCollectionFromDb("SELECT player_id, selected_card_id FROM player", true);
+        $selectedCardIDs = $this->getCollectionFromDb("SELECT `player_id`, `selected_card_id` FROM `player`", true);
         $privateData = [];
         $autoPlayCards = $this->shouldAutoSelectCards();
         $autoPlayPlayerIDs = array_fill_keys(array_column($autoPlayCards, 'playerID'), true); //playerIDs of every player who will auto play a card
@@ -263,7 +263,7 @@ class Ninjan extends Table
 
     public function stSelectCard(): void {
         $autoPlayCards = $this->shouldAutoSelectCards();
-        self::DbQuery("UPDATE player SET selected_card_id = NULL, pre_selected_card_id = NULL, made_card_selection_this_round = 'false'");
+        self::DbQuery("UPDATE `player` SET `selected_card_id` = NULL, `pre_selected_card_id` = NULL, `made_card_selection_this_round` = 'false'");
         $this->gamestate->setAllPlayersMultiactive();
 
         foreach($autoPlayCards as $index => $autoPlayData)
@@ -271,12 +271,12 @@ class Ninjan extends Table
     }
 
     public function stDisplaySelectedCards(): void {
-        $selectedCards = self::getCollectionFromDb("SELECT cards.card_id as card_id, suit, rank, player.player_zombie as is_zombie FROM player INNER JOIN cards ON cards.card_id = player.selected_card_id AND cards.card_location_arg = player.player_id");
+        $selectedCards = self::getCollectionFromDb("SELECT `cards`.`card_id` as `card_id`, `suit`, `rank`, `player`.`player_zombie` as is_zombie FROM `player` INNER JOIN `cards` ON `cards`.`card_id` = `player`.`selected_card_id` AND `cards`.`card_location_arg` = `player`.`player_id`");
         $sortedCardIDs = $this->tableManager->sortRockPaperScissors($selectedCards);
 
         foreach ($sortedCardIDs as $index => $cardData) {
             $cardData['card_location_arg'] = $index;
-            self::DbQuery("UPDATE cards SET card_location = 'pile_queue', location_on_pile = $index WHERE card_id = ".$cardData['card_id']);
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'pile_queue', `location_on_pile` = $index WHERE `card_id` = ".$cardData['card_id']);
         }
 
         $pileQueue = $this->pileManager->getPileQueue();
@@ -366,13 +366,13 @@ class Ninjan extends Table
         // For example, if the game was running with a release of your game named "140430-1345",
         // $from_version is equal to 1404301345
  
-        if($from_version <= 2412011832) //to do: added on 2-12-2024
-        {
-            // ! important ! Use DBPREFIX_<table_name> for all tables
+        // if($from_version <= 2412011832) //added on 2-12-2024
+        // {
+        //     // ! important ! Use DBPREFIX_<table_name> for all tables
 
-            $sql = "ALTER TABLE DBPREFIX_player ADD pre_selected_card_id INT NULL DEFAULT NULL;";
-            self::applyDbUpgradeToAllDB($sql);
-        }
+        //     $sql = "ALTER TABLE DBPREFIX_player ADD `pre_selected_card_id` INT NULL DEFAULT NULL;";
+        //     self::applyDbUpgradeToAllDB($sql);
+        // }
     }
 
     /*
@@ -393,12 +393,12 @@ class Ninjan extends Table
 
         // Get information about players.
         // NOTE: you can retrieve some extra field you added for "player" table in `dbmodel.sql` if you need it.
-        $result["players"] = $this->getCollectionFromDb("SELECT player_id, player_no, player_score score FROM player");
+        $result["players"] = $this->getCollectionFromDb("SELECT `player_id`, `player_no`, `player_score` score FROM `player`");
 
         $result['pilesData'] = $this->pileManager->getAllPiles();
         $result['pileQueueData'] = $this->pileManager->getPileQueue();
         
-        $myPlayerData = $this->getObjectFromDB( "SELECT sort_cards_by, COALESCE(pre_selected_card_id, selected_card_id) as selected_card_id FROM player WHERE player_id = $current_player_id" );
+        $myPlayerData = $this->getObjectFromDB( "SELECT `sort_cards_by`, COALESCE(`pre_selected_card_id`, `selected_card_id`) as selected_card_id FROM `player` WHERE `player_id` = $current_player_id" );
         if($myPlayerData){
             $result['my_hand'] = $this->handManager->getPlayerHand($current_player_id);
             $result['sort_cards_by'] = $myPlayerData['sort_cards_by'];
@@ -440,7 +440,7 @@ class Ninjan extends Table
         // additional fields directly here.
         static::DbQuery(
             sprintf(
-                "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar) VALUES %s",
+                "INSERT INTO `player` (`player_id`, `player_color`, `player_canal`, `player_name`, `player_avatar`) VALUES %s",
                 implode(",", $query_values)
             )
         );
@@ -469,7 +469,7 @@ class Ninjan extends Table
                 $cardRows[] = "(NULL, 'card', '0', 'returned_to_box', '0', '$i', '$j')";
             }
         }
-        self::DbQuery("INSERT INTO cards (card_id, card_type, card_type_arg, card_location, card_location_arg, suit, rank) VALUES ".implode(',', $cardRows)); 
+        self::DbQuery("INSERT INTO `cards` (`card_id`, `card_type`, `card_type_arg`, `card_location`, `card_location_arg`, `suit`, `rank`) VALUES ".implode(',', $cardRows)); 
 
         $this->tableManager->shuffleAndDealCards();
 
@@ -484,21 +484,21 @@ class Ninjan extends Table
         $current_player_id = $this->getCurrentPlayerId();
         $sortBy = $isSuit ? 'suit' : 'rank';
 
-        self::DbQuery("UPDATE player SET sort_cards_by = '$sortBy' WHERE player_id = $current_player_id");
+        self::DbQuery("UPDATE `player` SET `sort_cards_by` = '$sortBy' WHERE `player_id` = $current_player_id");
     }
 
     function customGetPlayersNumber($noZombies = false) {
         if ($noZombies)
-            return (int) $this->getUniqueValueFromDB("SELECT count(*) as count FROM player WHERE player_zombie = 0");
+            return (int) $this->getUniqueValueFromDB("SELECT count(*) as count FROM `player` WHERE `player_zombie` = 0");
         return $this->getPlayersNumber();
     }
 
     function zombifyCardsIfNeeded(){
-        $zombiePlayers = $this->getCollectionFromDb("SELECT player_id FROM player WHERE player_zombie = 1");
+        $zombiePlayers = $this->getCollectionFromDb("SELECT `player_id` FROM `player` WHERE `player_zombie` = 1");
 
         foreach($zombiePlayers as $zombiePlayerID => $row){
-            self::DbQuery("UPDATE cards SET card_location = 'zombified' WHERE card_location_arg = $zombiePlayerID");
-            self::DbQuery("UPDATE player SET selected_card_id = NULL WHERE player_id = $zombiePlayerID");
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'zombified' WHERE `card_location_arg` = $zombiePlayerID");
+            self::DbQuery("UPDATE `player` SET `selected_card_id` = NULL WHERE `player_id` = $zombiePlayerID");
         }
     }
 
@@ -532,7 +532,7 @@ class Ninjan extends Table
                 $bestPileScore = -INF;
                 $bestPileIndex = false;
                 foreach($possiblePiles['pile_indices'] as $index => $pileIndex){
-                    $pileSum = (int) $this->getUniqueValueFromDB("SELECT SUM(rank) FROM cards WHERE card_location = 'pile' AND card_location_arg = $pileIndex");
+                    $pileSum = (int) $this->getUniqueValueFromDB("SELECT SUM(`rank`) FROM `cards` WHERE `card_location` = 'pile' AND `card_location_arg` = $pileIndex");
                     if($pileSum > $bestPileScore){
                         $bestPileScore = $pileSum;
                         $bestPileIndex = $pileIndex;
@@ -548,11 +548,11 @@ class Ninjan extends Table
     private function shouldAutoSelectCards(): array{
         $autoPlayCards = [];
         if($this->tableManager->isLastCards()){ // auto-play last cards of hands
-            $playerCards = $this->getObjectListFromDB( "SELECT card_id, card_location_arg as player_id FROM cards WHERE card_location = 'player'" );
+            $playerCards = $this->getObjectListFromDB( "SELECT `card_id`, `card_location_arg` as `player_id` FROM `cards` WHERE `card_location` = 'player'" );
             foreach($playerCards as $index => $row)
                 $autoPlayCards[] = ['cardID' => $row['card_id'], 'playerID' => $row['player_id']];
         } else {
-            $preSelectedCards = $this->getCollectionFromDb("SELECT player_id, pre_selected_card_id FROM `player` WHERE pre_selected_card_id IS NOT NULL;", true);
+            $preSelectedCards = $this->getCollectionFromDb("SELECT `player_id`, `pre_selected_card_id` FROM `player` WHERE `pre_selected_card_id` IS NOT NULL;", true);
 
             foreach($preSelectedCards as $playerID => $cardID)
                 $autoPlayCards[] = ['cardID' => $cardID, 'playerID' => $playerID];
@@ -600,7 +600,7 @@ class Ninjan extends Table
     {
         $state_name = $state["name"];
 
-        $selectedCardID = $this->getUniqueValueFromDB("SELECT selected_card_id FROM player WHERE player_id = $active_player");
+        $selectedCardID = $this->getUniqueValueFromDB("SELECT `selected_card_id` FROM `player` WHERE `player_id` = $active_player");
         $this->zombifyCardsIfNeeded();
 
         if ($state["type"] === "activeplayer") {

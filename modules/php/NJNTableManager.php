@@ -10,17 +10,17 @@ class NJNTableManager extends APP_DbObject{
     function shuffleAndDealCards(){
         $this->parent->cardsDeck->shuffle('returned_to_box');
 
-        $playerIDs = self::getObjectListFromDB("SELECT player_id FROM player", true);
+        $playerIDs = self::getObjectListFromDB("SELECT `player_id` FROM `player`", true);
         $end = 0;
         foreach($playerIDs as $index => $player_id){
             $start = $index * HAND_SIZE;
             $end = $start + HAND_SIZE - 1;
 
-            self::DbQuery("UPDATE cards SET card_location = 'player', card_location_arg = $player_id WHERE card_location = 'returned_to_box' AND card_location_arg >= $start AND card_location_arg <= $end");
+            self::DbQuery("UPDATE `cards` SET `card_location` = 'player', `card_location_arg` = $player_id WHERE `card_location` = 'returned_to_box' AND `card_location_arg` >= $start AND `card_location_arg` <= $end");
         }
 
         for($i = 0; $i < PILE_COUNT; $i++)
-        	self::DbQuery("UPDATE cards SET card_location = 'pile', card_location_arg = $i, card_type_arg = 0, location_on_pile = 0 WHERE card_location = 'returned_to_box' AND card_location_arg = ".($end + $i + 1));
+        	self::DbQuery("UPDATE `cards` SET `card_location` = 'pile', `card_location_arg` = $i, `card_type_arg` = 0, `location_on_pile` = 0 WHERE `card_location` = 'returned_to_box' AND `card_location_arg` = ".($end + $i + 1));
     }
 
     function sortRockPaperScissors($cards) {
@@ -69,11 +69,11 @@ class NJNTableManager extends APP_DbObject{
         return $sortedCards;
     }
 
-    function getRemainingPlayerCardsCount(){ return (int) $this->getUniqueValueFromDB("SELECT count(*) FROM cards WHERE card_location = 'player'"); }
+    function getRemainingPlayerCardsCount(){ return (int) $this->getUniqueValueFromDB("SELECT count(*) FROM `cards` WHERE `card_location` = 'player'"); }
     function isLastCards(){ return $this->getRemainingPlayerCardsCount() <= $this->parent->customGetPlayersNumber(true); }
-    function arePlayerCardsFinished(){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM cards WHERE card_location = 'player') AS exists_in_player") == 0; }
-    function anyPilesTaken($playerID = false){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM cards WHERE card_location = 'scored'".($playerID ? " AND card_location_arg = $playerID" : "").") AS exists_scored_card") != 0; }
-    function getPlayedCards(){ return $this->getDoubleKeyCollectionFromDB("SELECT suit, rank, card_id FROM cards WHERE card_location IN('pile', 'pile_queue', 'scored')", false); }
+    function arePlayerCardsFinished(){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM `cards` WHERE `card_location` = 'player') AS exists_in_player") == 0; }
+    function anyPilesTaken($playerID = false){ return (int) $this->getUniqueValueFromDB("SELECT EXISTS (SELECT 1 FROM `cards` WHERE `card_location` = 'scored'".($playerID ? " AND `card_location_arg` = $playerID" : "").") AS exists_scored_card") != 0; }
+    function getPlayedCards(){ return $this->getDoubleKeyCollectionFromDB("SELECT `suit`, `rank`, `card_id` FROM `cards` WHERE `card_location` IN('pile', 'pile_queue', 'scored')", false); }
 }
 
 ?>

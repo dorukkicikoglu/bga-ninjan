@@ -34,7 +34,7 @@ class NJNGlobalsManager extends APP_DbObject{
 
     function get($key) { return $this->parent->getGameStateValue($key); }
     function set($key, $newVal) { $this->parent->setGameStateValue($key, $newVal); }
-    function getPref($key, $playerID) { return (int) $this->getUniqueValueFromDB("SELECT pgp_value FROM bga_user_preferences WHERE pgp_preference_id = '".$this->userPrefs[$key]."' AND pgp_player = $playerID"); }
+    function getPref($key, $playerID) { return (int) $this->getUniqueValueFromDB("SELECT `pgp_value` FROM `bga_user_preferences` WHERE `pgp_preference_id` = '".$this->userPrefs[$key]."' AND `pgp_player` = $playerID"); }
 }
 
 ?>
