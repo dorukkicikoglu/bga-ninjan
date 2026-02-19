@@ -19,7 +19,16 @@ class PrefHandler{
         }
     }
 
-    public setPref(prefIndex, newValue) {
+    private getNumericPrefIndex(prefIndex) {
+        if(this.gameui.prefs.hasOwnProperty(prefIndex))
+            return prefIndex;
+        else if(this.prefNameToIndex.hasOwnProperty(prefIndex))
+            return this.prefNameToIndex[prefIndex];
+        return null;
+    }
+
+    public setPref(prefIndexStr: string, newValue: number) {
+        const prefIndex: number = this.getNumericPrefIndex(prefIndexStr);
         this.gameui.bga.userPreferences.set(prefIndex, newValue);
     }
 

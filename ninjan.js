@@ -1314,7 +1314,15 @@ var PrefHandler = /** @class */ (function () {
                 break;
         }
     };
-    PrefHandler.prototype.setPref = function (prefIndex, newValue) {
+    PrefHandler.prototype.getNumericPrefIndex = function (prefIndex) {
+        if (this.gameui.prefs.hasOwnProperty(prefIndex))
+            return prefIndex;
+        else if (this.prefNameToIndex.hasOwnProperty(prefIndex))
+            return this.prefNameToIndex[prefIndex];
+        return null;
+    };
+    PrefHandler.prototype.setPref = function (prefIndexStr, newValue) {
+        var prefIndex = this.getNumericPrefIndex(prefIndexStr);
         this.gameui.bga.userPreferences.set(prefIndex, newValue);
     };
     PrefHandler.prototype.getPref = function (prefIndex) {
