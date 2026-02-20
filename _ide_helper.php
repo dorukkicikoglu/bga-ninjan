@@ -2899,6 +2899,11 @@ namespace {
             return null;
         }
 
+        public function getDoubleKeyCollectionFromDB(string $sql, bool $bSingleValue = false): array
+        {
+            return [];
+        }
+
         public function getObjectFromDB(string $sql): array {
             return [];
         }
