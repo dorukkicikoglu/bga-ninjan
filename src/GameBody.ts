@@ -11,7 +11,9 @@ class GameBody extends GameGui {
     public animationHandler: AnimationHandler;
     public players: Record<number, PlayerHandler> = {};
     public myself: PlayerHandler;
-    private pileHandler: PileHandler;
+    public pileHandler: PileHandler;
+    public recapHandler: RecapHandler;
+    public isAnimatingNotification: boolean = false;
     public prefHandler: PrefHandler;
     public backgroundHandler: BackgroundHandler;
     public tooltipHandler: TooltipHandler;
@@ -69,6 +71,7 @@ class GameBody extends GameGui {
 
         this.tooltipHandler = new TooltipHandler(this, gamedatas.played_cards);
         this.logMutationObserver = new LogMutationObserver(this);
+        this.recapHandler = new RecapHandler(this, gamedatas.lastRoundRecap || null, !!gamedatas.recapAutoplayEligible);
 
         // Setup game notifications to handle (see "setupNotifications" method below)
         this.setupNotifications();
@@ -120,6 +123,9 @@ class GameBody extends GameGui {
 
     public onUpdateActionButtons(stateName: string, args: any) {
         console.log( 'onUpdateActionButtons: '+stateName, args );
+
+        if(this.recapHandler)
+            this.recapHandler.ensureButton();
                   
         switch( stateName )
         {
@@ -146,7 +152,13 @@ class GameBody extends GameGui {
         synchronousEvents.forEach(event => { this.notifqueue.setSynchronous(event); });
     }
 
-    public releaseNotification(){ this.notifqueue.setSynchronousDuration(0); }
+    public releaseNotification(){ 
+        this.isAnimatingNotification = false;
+        this.notifqueue.setSynchronousDuration(0); 
+        this.recapHandler.ensureButton();
+    }
+
+    private startAnimatingNotification(): void { this.isAnimatingNotification = true; this.recapHandler.ensureButton(); }
 
     public notif_cardSelectionConfirmed(notif): void {
         console.log('notif_cardSelectionConfirmed');
@@ -170,6 +182,14 @@ class GameBody extends GameGui {
         console.log('notif_animateSelectedCards');
         console.log(notif);
 
+        if(this.recapHandler.deferWhilePlaying(() => { this.notif_animateSelectedCards(notif); }))
+            return;
+
+        this.startAnimatingNotification();
+        this.recapHandler.setRecapData(notif.args.round_recap);
+        if(notif.args.round_recap)
+            this.recapHandler.markRoundSeenLive(notif.args.round_recap.round);
+
         if(notif.args.is_final_round)
             this.updateStatusText('Final round! Revealing cards...')
 
@@ -179,6 +199,12 @@ class GameBody extends GameGui {
     public notif_animatePileTaken(notif): void {
         console.log('notif_animatePileTaken');
         console.log(notif);
+
+        if(this.recapHandler.deferWhilePlaying(() => { this.notif_animatePileTaken(notif); }))
+            return;
+
+        this.startAnimatingNotification();
+        this.recapHandler.setRecapData(notif.args.round_recap);
 
         if(parseInt(notif.args.new_score) == notif.args.new_score)
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
@@ -190,6 +216,11 @@ class GameBody extends GameGui {
     public notif_endingGameNoCardCanBeTaken(notif): void {
         console.log('notif_endingGameNoCardCanBeTaken');
         console.log(notif);
+
+        if(this.recapHandler.deferWhilePlaying(() => { this.notif_endingGameNoCardCanBeTaken(notif); }))
+            return;
+
+        this.startAnimatingNotification();
 
         this.updateStatusText('No more cards can be taken. Ending the game');
         this.dotTicks($('pagemaintitletext'));

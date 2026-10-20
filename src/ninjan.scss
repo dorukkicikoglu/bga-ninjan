@@ -223,6 +223,22 @@ body.mobile_version{
 }
 .gamestate_gameEnd #maintitlebar_content .loader-span{ display: none !important; }
 
+#page-title{
+	.replay-round-button{ position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 2; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-size: 30px; color: #621f1f; opacity: 0.75; cursor: pointer; transition: opacity 0.2s, background-color 0.2s; @include non-selectable();
+		i{ display: block; line-height: 1; }
+		&:hover, &:focus-visible{ opacity: 1; background-color: #ffcae780; outline: none; }
+	}
+	&.replay-round-button-visible #maintitlebar_content{ padding-left: 48px; }
+}
+
+.tooltip-wrapper.replay-round-tooltip{ padding: 6px 10px; white-space: nowrap; font-size: 15px; font-weight: bold; color: #070031d9; }
+.dijitTooltip:has(.replay-round-tooltip){ animation: replay-round-tooltip-fade-in 0.25s ease-out; } /* fades in only, hides instantly */
+@keyframes replay-round-tooltip-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.round-recap-playing{
+	.my-hand-container .cards-container, .my-hand-container .order-cards-button, .piles-container, #pagemaintitletext .confirm-play-button{ pointer-events: none; }
+}
+
 .background-container{ --char-width: 13.63vh; position: fixed; width: 100%; height: 100%; background: var(--page-background-color);	
 	.bg-front{ display: block; position: absolute; bottom: calc(var(--char-width)*-0.1); left: 0px; background-image: var(--image-source-bg-front); width: 100%; height: calc(var(--char-width)* 3.1); background-repeat: repeat-x; background-size: auto 100%;
 		&:after{ content: ""; background-image: var(--image-source-bg-front); transform: rotate(182deg); top: calc(var(--char-width)*-0.4); background-position-x: -390%; position: fixed; left: 0px; width: 100%; height: calc(var(--char-width)* 3.1); background-repeat: repeat-x; background-size: auto 100%; }

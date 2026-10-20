@@ -170,6 +170,16 @@ class Ninjan extends Table
             $this->giveExtraTime($activePlayerID);
 
         $isTaking = $possiblePiles['reason'] == 'take';
+
+        $roundRecap = $this->addRoundRecapStep([
+            'player_id' => $activePlayerID,
+            'card' => $selectedCard,
+            'action' => $isTaking ? 'take' : 'place',
+            'pile_index' => (int) $pileIndex,
+            'taken_cards' => $isTaking ? $pileCards : [],
+            'auto' => (bool) $autoPlay
+        ]);
+
         $cardIconsData = $isTaking ? $pileCards : [$selectedCard];
         
         $cardIconStr = []; //needed for the game replay page
@@ -193,7 +203,8 @@ class Ninjan extends Table
                 'selected_card_data' => $selectedCard,
                 'reason' => $possiblePiles['reason'],
                 'new_score' => $newScore,
-                'autoPlay' => $autoPlay
+                'autoPlay' => $autoPlay,
+                'round_recap' => $roundRecap
             ) 
         );
 
@@ -271,6 +282,7 @@ class Ninjan extends Table
     }
 
     public function stDisplaySelectedCards(): void {
+        $pilesBeforeRound = $this->pileManager->getAllPiles();
         $selectedCards = self::getCollectionFromDb("SELECT `cards`.`card_id` as `card_id`, `suit`, `rank`, `player`.`player_zombie` as is_zombie FROM `player` INNER JOIN `cards` ON `cards`.`card_id` = `player`.`selected_card_id` AND `cards`.`card_location_arg` = `player`.`player_id`");
         $sortedCardIDs = $this->tableManager->sortRockPaperScissors($selectedCards);
 
@@ -291,6 +303,8 @@ class Ninjan extends Table
             $cardsDataStr[] = $this->getPlayerNameById($cardData['owner_id']).' → '.$this->getCardLogHTML($cardData);
         $cardsDataStr = implode(', ', $cardsDataStr);
 
+        $roundRecap = $this->startRoundRecap($pilesBeforeRound, $pileQueue);
+
         $this->notifyAllPlayers('notif_animateSelectedCards', '${REVEALED_CARDS_DATA_STR}', array(
             'LOG_CLASS' => 'selected-cards-log',
             'preserve' => ['LOG_CLASS'],
@@ -298,7 +312,8 @@ class Ninjan extends Table
             'REVEALED_CARDS_DATA_STR' => $cardsDataStr,
             'pile_queue_data' => $pileQueue, 
             'is_final_round' => $this->tableManager->arePlayerCardsFinished(), 
-            'auto_play' => $this->tableManager->isLastCards()
+            'auto_play' => $this->tableManager->isLastCards(),
+            'round_recap' => $roundRecap
         ));
         $this->gamestate->nextState('nextPlayer');
     }
@@ -409,6 +424,10 @@ class Ninjan extends Table
         $result['played_cards'] = $this->tableManager->getPlayedCards();
         $result['pref_names'] = $this->globalsManager->userPrefs;
 
+        $result['lastRoundRecap'] = $this->getRoundRecap();
+        $stateName = $this->gamestate->getCurrentMainState()->name;
+        $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && (($stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id)) || $stateName == 'gameEnd');
+
         return $result;
     }
 
@@ -505,6 +524,46 @@ class Ninjan extends Table
     function getCardLogHTML($cardData){
         $suitData = SUIT_DATA[(int) $cardData['suit']];
         return '<span style="color:#'.$suitData['colorCode'].';">'.$cardData['rank'].'&nbsp;<span style="position: absolute;opacity: 0;width: 0px;height: 0px;">'.$suitData['name'].'</span>'.$suitData['font-awesome'].'</span>';
+    }
+
+    function getRoundRecap(): ?array {
+        $roundRecap = $this->globals->get('last_round_recap');
+        if(is_object($roundRecap))
+            $roundRecap = json_decode(json_encode($roundRecap), true);
+
+        return is_array($roundRecap) ? $roundRecap : null;
+    }
+
+    function startRoundRecap($pilesBeforeRound, $pileQueue): ?array { //overwrites previous round's recap
+        if(!$pileQueue)
+            return null;
+
+        $remainingHandCount = (int) $this->getUniqueValueFromDB("SELECT count(*) FROM `cards` WHERE `card_location` = 'player' AND `card_location_arg` = ".(int) $pileQueue[0]['owner_id']);
+
+        $pilesBefore = [];
+        for($i = 0; $i < PILE_COUNT; $i++)
+            $pilesBefore[$i] = $pilesBeforeRound[$i] ?? [];
+
+        $roundRecap = [
+            'round' => HAND_SIZE - $remainingHandCount,
+            'piles_before' => $pilesBefore,
+            'revealed' => $pileQueue,
+            'steps' => []
+        ];
+        $this->globals->set('last_round_recap', $roundRecap);
+
+        return $roundRecap;
+    }
+
+    function addRoundRecapStep($step): ?array {
+        $roundRecap = $this->getRoundRecap();
+        if($roundRecap === null)
+            return null;
+
+        $roundRecap['steps'][] = $step;
+        $this->globals->set('last_round_recap', $roundRecap);
+
+        return $roundRecap;
     }
 
     function shouldEndGameEarly($pileQueue){
@@ -606,16 +665,27 @@ class Ninjan extends Table
         if ($state["type"] === "activeplayer") {
             switch ($state_name) {
                 case 'takePile':
-                    if($selectedCardID)
+                    if($selectedCardID){
+                        $roundRecap = $this->addRoundRecapStep([
+                            'player_id' => $active_player,
+                            'card' => $this->getObjectFromDB("SELECT `card_id`, `suit`, `rank` FROM `cards` WHERE `card_id` = $selectedCardID"),
+                            'action' => 'zombie',
+                            'pile_index' => null,
+                            'taken_cards' => [],
+                            'auto' => true
+                        ]);
+
                         $this->notifyAllPlayers("notif_animatePileTaken", '',
                             array( 
                                 'player_id' => $active_player,
                                 'pile_index' => 'zombie',
                                 'selected_card_data' => ['card_id' => $selectedCardID],
                                 'reason' => 'zombie',
-                                'autoPlay' => true
+                                'autoPlay' => true,
+                                'round_recap' => $roundRecap
                             ) 
                         );
+                    }
                     $this->gamestate->nextState("zombiePass");
                     break;
                 default:

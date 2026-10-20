@@ -36,6 +36,9 @@ class HandHandler{
     }
 
     private orderCardsButtonClicked(): void{
+        if(this.gameui.recapHandler.isPlaying())
+            return;
+
         this.sortCardsBy = (this.sortCardsBy == 'suit' ? 'rank' : 'suit');
         this.gameui.ajaxAction('setSortCardsBy', {isSuit: this.sortCardsBy == 'suit'}, false, false);
         this.reorderCards(true);
@@ -128,7 +131,7 @@ class HandHandler{
     }
 
     private cardsContainerClicked(event: Event){
-        if(!['selectCard', 'takePile'].includes(this.gameui.gamedatas.gamestate.name) || this.gameui.isInterfaceLocked())
+        if(!['selectCard', 'takePile'].includes(this.gameui.gamedatas.gamestate.name) || this.gameui.isInterfaceLocked() || this.gameui.recapHandler.isPlaying())
             return;
 
         if(!dojo.hasClass(event.target, 'a-card'))
@@ -249,6 +252,9 @@ class HandHandler{
     }
 
     private confirmPlayButtonClicked(){
+        if(this.gameui.recapHandler.isPlaying())
+            return;
+
         let selectedCard = dojo.query('.a-card[selected=true]', this.handContainer);
 
         if(selectedCard.length <= 0)

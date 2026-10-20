@@ -651,6 +651,66 @@ body.mobile_version {
   display: none !important;
 }
 
+#page-title .replay-round-button {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 30px;
+  color: #6f1f13;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.2s, background-color 0.2s;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+#page-title .replay-round-button i {
+  display: block;
+  line-height: 1;
+}
+#page-title .replay-round-button:hover, #page-title .replay-round-button:focus-visible {
+  opacity: 1;
+  background-color: rgba(255, 202, 231, 0.5019607843);
+  outline: none;
+}
+#page-title.replay-round-button-visible #maintitlebar_content {
+  padding-left: 48px;
+}
+
+.tooltip-wrapper.replay-round-tooltip {
+  padding: 6px 10px;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: bold;
+  color: rgba(7, 0, 49, 0.8509803922);
+}
+
+.dijitTooltip:has(.replay-round-tooltip) {
+  animation: replay-round-tooltip-fade-in 0.25s ease-out;
+} /* fades in only, hides instantly */
+@keyframes replay-round-tooltip-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.round-recap-playing .my-hand-container .cards-container, .round-recap-playing .my-hand-container .order-cards-button, .round-recap-playing .piles-container, .round-recap-playing #pagemaintitletext .confirm-play-button {
+  pointer-events: none;
+}
+
 .background-container {
   --char-width: 13.63vh;
   position: fixed;

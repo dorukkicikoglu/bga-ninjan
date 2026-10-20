@@ -27,6 +27,26 @@ class PileHandler{
         }
     }
 
+    public getStateSnapshot(): { pilesData: CardData[][], pileQueueData: CardData[] } { return JSON.parse(JSON.stringify({pilesData: this.pilesData, pileQueueData: this.pileQueueData})); }
+
+    public renderState(pilesData: CardData[][], pileQueueData: CardData[]): void { //redraws piles and queue without animation, used by RecapHandler
+        dojo.query('#page-content > .a-card, #page-content > .player-name-text, .card-to-animate-to-board').forEach(dojo.destroy); //leftover animation clones
+        dojo.query('.piles-container, .pile-queue-container', this.pilesRow).forEach((node) => { if(node !== this.pilesContainer && node !== this.pileQueueContainer) dojo.destroy(node); });
+
+        dojo.empty(this.pilesContainer);
+        this.pilesContainer.removeAttribute('style');
+        this.pileContainers = {};
+        this.pilesData = pilesData;
+        this.displayPiles();
+
+        dojo.removeClass(this.pilesRow, 'expanded');
+        dojo.removeAttr(this.pileQueueContainer, 'line-hidden');
+        dojo.removeAttr(this.pileQueueContainer, 'width-set');
+        this.pileQueueContainer.removeAttribute('style');
+        this.pileQueueData = pileQueueData;
+        this.fillPileQueue();
+    }
+
     private addPileSumText(pileIndex: number): void {
         let pileContainer = this.pileContainers[pileIndex];
         let pileCardCount = this.pilesData[pileIndex].length;
@@ -79,7 +99,7 @@ class PileHandler{
     }
 
     private pilesContainerClicked(event: MouseEvent){
-        if(this.gameui.isInterfaceLocked() || this.gameui.gamedatas.gamestate.name != 'takePile' || !this.gameui.isCurrentPlayerActive())
+        if(this.gameui.isInterfaceLocked() || this.gameui.recapHandler.isPlaying() || this.gameui.gamedatas.gamestate.name != 'takePile' || !this.gameui.isCurrentPlayerActive())
             return;
 
         let pileContainer = $(event.target).closest('.a-pile-container')
@@ -102,9 +122,9 @@ class PileHandler{
         this.pileQueueContainer.removeAttribute('style');
     }
 
-    public animatePileQueue(pileQueueDataIn: CardData[], autoPlay: boolean){
+    public animatePileQueue(pileQueueDataIn: CardData[], autoPlay: boolean, onComplete: () => void = null){ //onComplete replaces releasing the notification, used by RecapHandler
         if(autoPlay){
-            setTimeout(() => { this.animatePileQueue(pileQueueDataIn, false); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
+            setTimeout(() => { this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
             return;
         }
 
@@ -235,13 +255,13 @@ class PileHandler{
                 this.gameui.myself.hand.setHandCountAttrForMobileResizing(true); 
 
             this.gameui.tooltipHandler.addNewPlayedCard(this.pileQueueData);
-            this.gameui.releaseNotification(); 
+            onComplete ? onComplete() : this.gameui.releaseNotification(); 
         }, 200); };
 
         dojo.fx.combine([expandAnimations, slideAnimations]).play();
     }
 
-    public animatePileTaken(playerID: number, pileIndex: number, selectedCardData: CardData, reason: string, autoPlay: boolean, cardIconsData: any): void {
+    public animatePileTaken(playerID: number, pileIndex: number, selectedCardData: CardData, reason: string, autoPlay: boolean, cardIconsData: any, onComplete: () => void = null): void { //onComplete replaces releasing the notification, used by RecapHandler
         if(reason != 'zombie'){ //update status text if not zombie
             if(reason == 'take')
                 this.pilesData[pileIndex] = [];
@@ -433,7 +453,7 @@ class PileHandler{
             
             this.gameui.tooltipHandler.addTooltipToCards();
 
-            setTimeout(() => { this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
+            setTimeout(() => { onComplete ? onComplete() : this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
         }
 
         setTimeout(() => { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);                

@@ -25,6 +25,8 @@ declare class GameGui {
     game_name: string;
     instantaneousMode: any;
     player_id: string;
+    table_id: number;
+    isSpectator: boolean;
     interface_min_width: number;
     gamedatas: any;
     prefs: any;
@@ -46,6 +48,8 @@ declare class GameGui {
     onUpdateActionButtons(stateName: string, args: any): void;
     setupNotifications(): void;
     addTooltipHtml( nodeID: string, html: string, delay: number ):void;
+    addTooltip( nodeID: string, helpString: string, actionString: string, delay?: number ):void;
+    updatePageTitle(): void;
 
     placeOnObject(mobileObj: HTMLDivElement, targetObj: HTMLDivElement): void;
     isInterfaceLocked(): boolean;

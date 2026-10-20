@@ -193,6 +193,7 @@ var GameBody = /** @class */ (function (_super) {
     function GameBody() {
         var _this = _super.call(this) || this;
         _this.players = {};
+        _this.isAnimatingNotification = false;
         _this.jstpl_card_icon = '<div class="a-card-icon" suit="${suit}" rank="${rank}" card-id="${card_id}"></div>';
         _this.jstpl_pile_container = '<div class="a-pile-container" pile-index="${pileIndex}"><i class="place-under-icon fa6 fa-share"></i></div>';
         _this.jstpl_queue_card = '<div class="a-queue-card-container"><div class="player-name-text">${playerName}</div></div>';
@@ -230,6 +231,7 @@ var GameBody = /** @class */ (function (_super) {
             this.pileHandler.pileQueueContainer.style.display = 'inline-block';
         this.tooltipHandler = new TooltipHandler(this, gamedatas.played_cards);
         this.logMutationObserver = new LogMutationObserver(this);
+        this.recapHandler = new RecapHandler(this, gamedatas.lastRoundRecap || null, !!gamedatas.recapAutoplayEligible);
         // Setup game notifications to handle (see "setupNotifications" method below)
         this.setupNotifications();
         console.log("Ending game setup");
@@ -267,6 +269,8 @@ var GameBody = /** @class */ (function (_super) {
     };
     GameBody.prototype.onUpdateActionButtons = function (stateName, args) {
         console.log('onUpdateActionButtons: ' + stateName, args);
+        if (this.recapHandler)
+            this.recapHandler.ensureButton();
         switch (stateName) {
             case 'selectCard':
                 var titleContainer = $('pagemaintitletext');
@@ -287,7 +291,12 @@ var GameBody = /** @class */ (function (_super) {
         var synchronousEvents = ['notif_animateSelectedCards', 'notif_animatePileTaken', 'notif_endingGameNoCardCanBeTaken'];
         synchronousEvents.forEach(function (event) { _this.notifqueue.setSynchronous(event); });
     };
-    GameBody.prototype.releaseNotification = function () { this.notifqueue.setSynchronousDuration(0); };
+    GameBody.prototype.releaseNotification = function () {
+        this.isAnimatingNotification = false;
+        this.notifqueue.setSynchronousDuration(0);
+        this.recapHandler.ensureButton();
+    };
+    GameBody.prototype.startAnimatingNotification = function () { this.isAnimatingNotification = true; this.recapHandler.ensureButton(); };
     GameBody.prototype.notif_cardSelectionConfirmed = function (notif) {
         console.log('notif_cardSelectionConfirmed');
         console.log(notif);
@@ -305,13 +314,24 @@ var GameBody = /** @class */ (function (_super) {
         var _this = this;
         console.log('notif_animateSelectedCards');
         console.log(notif);
+        if (this.recapHandler.deferWhilePlaying(function () { _this.notif_animateSelectedCards(notif); }))
+            return;
+        this.startAnimatingNotification();
+        this.recapHandler.setRecapData(notif.args.round_recap);
+        if (notif.args.round_recap)
+            this.recapHandler.markRoundSeenLive(notif.args.round_recap.round);
         if (notif.args.is_final_round)
             this.updateStatusText('Final round! Revealing cards...');
         setTimeout(function () { _this.pileHandler.animatePileQueue(notif.args.pile_queue_data, notif.args.auto_play); });
     };
     GameBody.prototype.notif_animatePileTaken = function (notif) {
+        var _this = this;
         console.log('notif_animatePileTaken');
         console.log(notif);
+        if (this.recapHandler.deferWhilePlaying(function () { _this.notif_animatePileTaken(notif); }))
+            return;
+        this.startAnimatingNotification();
+        this.recapHandler.setRecapData(notif.args.round_recap);
         if (parseInt(notif.args.new_score) == notif.args.new_score)
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
         this.hideRefCard();
@@ -321,6 +341,9 @@ var GameBody = /** @class */ (function (_super) {
         var _this = this;
         console.log('notif_endingGameNoCardCanBeTaken');
         console.log(notif);
+        if (this.recapHandler.deferWhilePlaying(function () { _this.notif_endingGameNoCardCanBeTaken(notif); }))
+            return;
+        this.startAnimatingNotification();
         this.updateStatusText('No more cards can be taken. Ending the game');
         this.dotTicks($('pagemaintitletext'));
         setTimeout(function () { _this.releaseNotification(); }, 5000);
@@ -579,6 +602,8 @@ var HandHandler = /** @class */ (function () {
         this.setHandCountAttrForMobileResizing(false);
     };
     HandHandler.prototype.orderCardsButtonClicked = function () {
+        if (this.gameui.recapHandler.isPlaying())
+            return;
         this.sortCardsBy = (this.sortCardsBy == 'suit' ? 'rank' : 'suit');
         this.gameui.ajaxAction('setSortCardsBy', { isSuit: this.sortCardsBy == 'suit' }, false, false);
         this.reorderCards(true);
@@ -656,7 +681,7 @@ var HandHandler = /** @class */ (function () {
         return diff;
     };
     HandHandler.prototype.cardsContainerClicked = function (event) {
-        if (!['selectCard', 'takePile'].includes(this.gameui.gamedatas.gamestate.name) || this.gameui.isInterfaceLocked())
+        if (!['selectCard', 'takePile'].includes(this.gameui.gamedatas.gamestate.name) || this.gameui.isInterfaceLocked() || this.gameui.recapHandler.isPlaying())
             return;
         if (!dojo.hasClass(event.target, 'a-card'))
             return;
@@ -758,6 +783,8 @@ var HandHandler = /** @class */ (function () {
         dojo.query('.confirm-play-button', selectedCardContainer).connect('onclick', this, function () { _this.confirmPlayButtonClicked(); });
     };
     HandHandler.prototype.confirmPlayButtonClicked = function () {
+        if (this.gameui.recapHandler.isPlaying())
+            return;
         var selectedCard = dojo.query('.a-card[selected=true]', this.handContainer);
         if (selectedCard.length <= 0)
             return;
@@ -939,6 +966,24 @@ var PileHandler = /** @class */ (function () {
             this.addPileSumText(Number(pileIndex));
         }
     };
+    PileHandler.prototype.getStateSnapshot = function () { return JSON.parse(JSON.stringify({ pilesData: this.pilesData, pileQueueData: this.pileQueueData })); };
+    PileHandler.prototype.renderState = function (pilesData, pileQueueData) {
+        var _this = this;
+        dojo.query('#page-content > .a-card, #page-content > .player-name-text, .card-to-animate-to-board').forEach(dojo.destroy); //leftover animation clones
+        dojo.query('.piles-container, .pile-queue-container', this.pilesRow).forEach(function (node) { if (node !== _this.pilesContainer && node !== _this.pileQueueContainer)
+            dojo.destroy(node); });
+        dojo.empty(this.pilesContainer);
+        this.pilesContainer.removeAttribute('style');
+        this.pileContainers = {};
+        this.pilesData = pilesData;
+        this.displayPiles();
+        dojo.removeClass(this.pilesRow, 'expanded');
+        dojo.removeAttr(this.pileQueueContainer, 'line-hidden');
+        dojo.removeAttr(this.pileQueueContainer, 'width-set');
+        this.pileQueueContainer.removeAttribute('style');
+        this.pileQueueData = pileQueueData;
+        this.fillPileQueue();
+    };
     PileHandler.prototype.addPileSumText = function (pileIndex) {
         var pileContainer = this.pileContainers[pileIndex];
         var pileCardCount = this.pilesData[pileIndex].length;
@@ -979,7 +1024,7 @@ var PileHandler = /** @class */ (function () {
         }
     };
     PileHandler.prototype.pilesContainerClicked = function (event) {
-        if (this.gameui.isInterfaceLocked() || this.gameui.gamedatas.gamestate.name != 'takePile' || !this.gameui.isCurrentPlayerActive())
+        if (this.gameui.isInterfaceLocked() || this.gameui.recapHandler.isPlaying() || this.gameui.gamedatas.gamestate.name != 'takePile' || !this.gameui.isCurrentPlayerActive())
             return;
         var pileContainer = $(event.target).closest('.a-pile-container');
         if (!dojo.hasClass(pileContainer, 'a-pile-container') || !dojo.hasAttr(pileContainer, 'click-reason'))
@@ -995,10 +1040,11 @@ var PileHandler = /** @class */ (function () {
         dojo.removeAttr(this.pileQueueContainer, 'width-set');
         this.pileQueueContainer.removeAttribute('style');
     };
-    PileHandler.prototype.animatePileQueue = function (pileQueueDataIn, autoPlay) {
+    PileHandler.prototype.animatePileQueue = function (pileQueueDataIn, autoPlay, onComplete) {
         var _this = this;
+        if (onComplete === void 0) { onComplete = null; }
         if (autoPlay) {
-            setTimeout(function () { _this.animatePileQueue(pileQueueDataIn, false); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
+            setTimeout(function () { _this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
             return;
         }
         this.pileQueueData = pileQueueDataIn;
@@ -1108,13 +1154,14 @@ var PileHandler = /** @class */ (function () {
                 if (_this.gameui.myself)
                     _this.gameui.myself.hand.setHandCountAttrForMobileResizing(true);
                 _this.gameui.tooltipHandler.addNewPlayedCard(_this.pileQueueData);
-                _this.gameui.releaseNotification();
+                onComplete ? onComplete() : _this.gameui.releaseNotification();
             }, 200);
         };
         dojo.fx.combine([expandAnimations, slideAnimations]).play();
     };
-    PileHandler.prototype.animatePileTaken = function (playerID, pileIndex, selectedCardData, reason, autoPlay, cardIconsData) {
+    PileHandler.prototype.animatePileTaken = function (playerID, pileIndex, selectedCardData, reason, autoPlay, cardIconsData, onComplete) {
         var _this = this;
+        if (onComplete === void 0) { onComplete = null; }
         if (reason != 'zombie') { //update status text if not zombie
             if (reason == 'take')
                 this.pilesData[pileIndex] = [];
@@ -1273,7 +1320,7 @@ var PileHandler = /** @class */ (function () {
             else
                 dojo.destroy(newPileCard);
             _this.gameui.tooltipHandler.addTooltipToCards();
-            setTimeout(function () { _this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
+            setTimeout(function () { onComplete ? onComplete() : _this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
         };
         setTimeout(function () { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);
     };
@@ -1337,6 +1384,203 @@ var PrefHandler = /** @class */ (function () {
         return this.gameui.bga.userPreferences.get(prefIndexNum);
     };
     return PrefHandler;
+}());
+var RecapHandler = /** @class */ (function () {
+    function RecapHandler(gameui, recapData, autoplayEligible) {
+        var _this = this;
+        this.gameui = gameui;
+        this.recapData = recapData;
+        this.stepTimeout = 10000; //fallback to current state if an animation never completes
+        this.stepGap = 300;
+        this.playing = false;
+        this.finishCurrentRecap = null;
+        this.deferredNotifs = [];
+        this.replayButton = null;
+        this.ensureButton();
+        if (!this.shouldAutoplay(autoplayEligible))
+            return;
+        this.setPlaying(true); //block interaction right away, animations start after the interface settles
+        setTimeout(function () { _this.play(true); }, 500);
+    }
+    RecapHandler.prototype.isPlaying = function () { return this.playing; };
+    RecapHandler.prototype.setRecapData = function (recapData) {
+        if (recapData === undefined) //notifications from before this feature don't carry recap data
+            return;
+        this.recapData = recapData;
+        this.ensureButton();
+    };
+    RecapHandler.prototype.deferWhilePlaying = function (callback) {
+        if (!this.playing)
+            return false;
+        this.deferredNotifs.push(callback);
+        return true;
+    };
+    RecapHandler.prototype.markRoundSeenLive = function (round) {
+        if (!this.gameui.myself || this.gameui.isSpectator || this.gameui.isReplay() || this.gameui.instantaneousMode)
+            return;
+        this.setSeen(round);
+    };
+    RecapHandler.prototype.ensureButton = function () {
+        var _this = this;
+        var pageTitle = $('page-title');
+        if (!pageTitle)
+            return;
+        if (!this.replayButton || !pageTitle.contains(this.replayButton)) {
+            var label = _('Replay last round');
+            if (getComputedStyle(pageTitle).position == 'static')
+                pageTitle.style.position = 'relative';
+            this.replayButton = dojo.create('div', { id: 'ninjan-replay-button', class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa fa-history"></i>' });
+            dojo.place(this.replayButton, pageTitle, 'first');
+            this.gameui.addTooltipHtml(this.replayButton.id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
+            dojo.connect(this.replayButton, 'onclick', function () { _this.play(false); });
+            dojo.connect(this.replayButton, 'onkeydown', function (event) {
+                if (event.key != 'Enter' && event.key != ' ')
+                    return;
+                event.preventDefault();
+                _this.play(false);
+            });
+        }
+        var isVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification;
+        this.replayButton.style.display = isVisible ? '' : 'none';
+        dojo.toggleClass(pageTitle, 'replay-round-button-visible', isVisible);
+    };
+    RecapHandler.prototype.shouldAutoplay = function (autoplayEligible) {
+        if (!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator)
+            return false;
+        if (this.gameui.isReplay() || this.gameui.instantaneousMode)
+            return false;
+        return !this.isSeen(this.recapData.round);
+    };
+    RecapHandler.prototype.play = function (isAutoplay) {
+        var _this = this;
+        if (!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification)
+            return;
+        var recap = JSON.parse(JSON.stringify(this.recapData));
+        var currentState = this.gameui.pileHandler.getStateSnapshot();
+        var currentScores = {};
+        var scoreAfterSteps = {};
+        for (var playerID in this.gameui.players) {
+            currentScores[playerID] = this.gameui.scoreCtrl[playerID] ? this.gameui.scoreCtrl[playerID].getValue() : 0;
+            scoreAfterSteps[playerID] = currentScores[playerID];
+        }
+        for (var _i = 0, _a = recap.steps; _i < _a.length; _i++) { //derive scores before the round from the current scores
+            var step = _a[_i];
+            if (step.action == 'take' && scoreAfterSteps.hasOwnProperty(step.player_id))
+                scoreAfterSteps[step.player_id] -= step.taken_cards.reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
+        }
+        var finished = false;
+        var watchdog = null;
+        var finish = function (failed) {
+            if (finished)
+                return;
+            finished = true;
+            clearTimeout(watchdog);
+            _this.restoreCurrentState(currentState, currentScores);
+            if (isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
+                _this.setSeen(recap.round);
+            if (failed)
+                console.error('Round recap failed, showing current state');
+            _this.finishCurrentRecap = null;
+            _this.setPlaying(false);
+            var deferredNotifs = _this.deferredNotifs;
+            _this.deferredNotifs = [];
+            deferredNotifs.forEach(function (callback) { callback(); });
+        };
+        this.finishCurrentRecap = finish;
+        var runAnimation = function (animate, next) {
+            if (finished)
+                return;
+            clearTimeout(watchdog);
+            watchdog = setTimeout(function () { finish(true); }, _this.stepTimeout);
+            var isDone = false;
+            var done = function () {
+                if (isDone || finished)
+                    return;
+                isDone = true;
+                clearTimeout(watchdog);
+                setTimeout(function () { if (!finished)
+                    next(); }, _this.stepGap);
+            };
+            try {
+                animate(done);
+            }
+            catch (e) {
+                console.error(e);
+                finish(true);
+            }
+        };
+        var runStep = function (stepIndex) {
+            if (stepIndex >= recap.steps.length) {
+                finish(false);
+                return;
+            }
+            var step = recap.steps[stepIndex];
+            var reason = step.action == 'take' ? 'take' : (step.action == 'place' ? 'place_under' : 'zombie');
+            var pileIndex = step.action == 'zombie' ? 'zombie' : step.pile_index;
+            var cardIconsData = step.action == 'take' ? step.taken_cards : [step.card];
+            runAnimation(function (done) {
+                if (step.action == 'take' && _this.gameui.scoreCtrl[step.player_id]) {
+                    scoreAfterSteps[step.player_id] += step.taken_cards.reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
+                    _this.gameui.scoreCtrl[step.player_id].toValue(scoreAfterSteps[step.player_id]);
+                }
+                _this.gameui.pileHandler.animatePileTaken(step.player_id, pileIndex, step.card, reason, step.auto, cardIconsData, done);
+            }, function () { runStep(stepIndex + 1); });
+        };
+        try {
+            this.setPlaying(true);
+            for (var playerID in scoreAfterSteps) {
+                if (this.gameui.scoreCtrl[playerID])
+                    this.gameui.scoreCtrl[playerID].setValue(scoreAfterSteps[playerID]);
+            }
+            this.gameui.pileHandler.renderState(recap.piles_before, []);
+            this.gameui.updateStatusText(dojo.string.substitute(_('Replaying round ${round}...'), { round: recap.round }));
+            runAnimation(function (done) { _this.gameui.pileHandler.animatePileQueue(recap.revealed, false, done); }, function () { runStep(0); });
+        }
+        catch (e) {
+            console.error(e);
+            finish(true);
+        }
+    };
+    RecapHandler.prototype.restoreCurrentState = function (currentState, currentScores) {
+        try {
+            this.gameui.pileHandler.renderState(currentState.pilesData, currentState.pileQueueData);
+            var gamestate = this.gameui.gamedatas.gamestate;
+            if (gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd
+                this.gameui.pileHandler.pileQueueContainer.style.display = 'inline-block';
+            for (var playerID in currentScores) {
+                if (this.gameui.scoreCtrl[playerID])
+                    this.gameui.scoreCtrl[playerID].setValue(currentScores[playerID]);
+            }
+            this.gameui.updatePageTitle();
+            if (gamestate.name == 'takePile' && gamestate.args && gamestate.args.possible_piles)
+                this.gameui.pileHandler.showPossiblePiles(gamestate.args.possible_piles);
+            this.gameui.tooltipHandler.addTooltipToCards();
+        }
+        catch (e) {
+            console.error('Could not restore current state after round recap', e);
+        }
+    };
+    RecapHandler.prototype.setPlaying = function (playing) {
+        this.playing = playing;
+        dojo.toggleClass(dojo.body(), 'round-recap-playing', playing);
+        this.ensureButton();
+    };
+    RecapHandler.prototype.getSeenKey = function (round) { return 'ninjan_recap_seen_' + this.gameui.table_id + '_' + this.gameui.player_id + '_' + round; };
+    RecapHandler.prototype.isSeen = function (round) {
+        try {
+            return window.localStorage.getItem(this.getSeenKey(round)) !== null;
+        }
+        catch (e) {
+            return false; //localStorage unavailable, autoplay on each load
+        }
+    };
+    RecapHandler.prototype.setSeen = function (round) {
+        try {
+            window.localStorage.setItem(this.getSeenKey(round), '1');
+        }
+        catch (e) { }
+    };
+    return RecapHandler;
 }());
 var TooltipHandler = /** @class */ (function () {
     function TooltipHandler(gameui, playedCards) {
