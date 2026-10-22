@@ -424,9 +424,13 @@ class Ninjan extends Table
         $result['played_cards'] = $this->tableManager->getPlayedCards();
         $result['pref_names'] = $this->globalsManager->userPrefs;
 
-        $result['lastRoundRecap'] = $this->getRoundRecap();
         $stateName = $this->gamestate->getCurrentMainState()->name;
-        $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && (($stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id)) || $stateName == 'gameEnd');
+        if($stateName == 'gameEnd') //no recap once the game has ended
+            $result['recapAutoplayEligible'] = false;
+        else {
+            $result['lastRoundRecap'] = $this->getRoundRecap();
+            $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && $stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id);
+        }
 
         return $result;
     }

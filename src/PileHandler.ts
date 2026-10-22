@@ -1,3 +1,5 @@
+type QueueLayout = { expanded: boolean, lineHidden: string | null, widthSet: string | null, style: string | null };
+
 class PileHandler{
     public pilesRow: HTMLDivElement;
     private pilesContainer: HTMLDivElement;
@@ -45,6 +47,16 @@ class PileHandler{
         this.pileQueueContainer.removeAttribute('style');
         this.pileQueueData = pileQueueData;
         this.fillPileQueue();
+    }
+
+    public getQueueLayoutSnapshot(): QueueLayout { return {expanded: dojo.hasClass(this.pilesRow, 'expanded'), lineHidden: this.pileQueueContainer.getAttribute('line-hidden'), widthSet: this.pileQueueContainer.getAttribute('width-set'), style: this.pileQueueContainer.getAttribute('style')}; }
+
+    public applyQueueLayoutSnapshot(layout: QueueLayout): void { //puts the row and queue back exactly as the snapshot found them, used by RecapHandler
+        dojo.toggleClass(this.pilesRow, 'expanded', layout.expanded);
+
+        const attrs: [string, string | null][] = [['line-hidden', layout.lineHidden], ['width-set', layout.widthSet], ['style', layout.style]];
+        for(const [attr, value] of attrs)
+            value === null ? this.pileQueueContainer.removeAttribute(attr) : this.pileQueueContainer.setAttribute(attr, value);
     }
 
     private addPileSumText(pileIndex: number): void {

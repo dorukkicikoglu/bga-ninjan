@@ -9,6 +9,7 @@ class RecapHandler{
     private finishCurrentRecap: ((failed: boolean) => void) | null = null;
     private deferredNotifs: (() => void)[] = [];
     private replayButton: HTMLDivElement = null;
+    private pageTitlePositioned: boolean = false;
 
     constructor(private gameui: GameBody, private recapData: RoundRecap | null, autoplayEligible: boolean) {
         this.ensureButton();
@@ -50,11 +51,18 @@ class RecapHandler{
         if(!pageTitle)
             return;
 
+        if(this.isLiveGameEnded()){ //no recap once the game has ended, a running replay is left to finish and restore the final board
+            this.removeButton(pageTitle);
+            return;
+        }
+
         if(!this.replayButton || !pageTitle.contains(this.replayButton)){
             const label = _('Replay last round');
 
-            if(getComputedStyle(pageTitle).position == 'static')
+            if(getComputedStyle(pageTitle).position == 'static'){
                 pageTitle.style.position = 'relative';
+                this.pageTitlePositioned = true;
+            }
 
             this.replayButton = dojo.create('div', {id: 'ninjan-replay-button', class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa fa-history"></i>'});
             dojo.place(this.replayButton, pageTitle, 'first');
@@ -74,8 +82,24 @@ class RecapHandler{
         dojo.toggleClass(pageTitle, 'replay-round-button-visible', isVisible);
     }
 
+    private removeButton(pageTitle: HTMLDivElement): void {
+        if(this.replayButton){
+            this.gameui.removeTooltip(this.replayButton.id);
+            dojo.destroy(this.replayButton);
+            this.replayButton = null;
+        }
+
+        dojo.removeClass(pageTitle, 'replay-round-button-visible');
+        if(this.pageTitlePositioned){
+            pageTitle.style.position = '';
+            this.pageTitlePositioned = false;
+        }
+    }
+
+    private isLiveGameEnded(): boolean { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); } //archive/replay mode keeps the recap at gameEnd
+
     private shouldAutoplay(autoplayEligible: boolean): boolean {
-        if(!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator)
+        if(!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded())
             return false;
 
         if(this.gameui.isReplay() || this.gameui.instantaneousMode)
@@ -85,11 +109,12 @@ class RecapHandler{
     }
 
     private play(isAutoplay: boolean): void {
-        if(!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification)
+        if(!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification || (!isAutoplay && this.isLiveGameEnded()))
             return;
 
         const recap: RoundRecap = JSON.parse(JSON.stringify(this.recapData));
         const currentState = this.gameui.pileHandler.getStateSnapshot();
+        const currentQueueLayout = this.gameui.pileHandler.getQueueLayoutSnapshot();
         const currentScores: Record<number, number> = {};
         const scoreAfterSteps: Record<number, number> = {};
 
@@ -112,7 +137,7 @@ class RecapHandler{
             finished = true;
             clearTimeout(watchdog);
 
-            this.restoreCurrentState(currentState, currentScores);
+            this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
 
             if(isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
                 this.setSeen(recap.round);
@@ -192,12 +217,15 @@ class RecapHandler{
         }
     }
 
-    private restoreCurrentState(currentState: { pilesData: CardData[][], pileQueueData: CardData[] }, currentScores: Record<number, number>): void {
+    private restoreCurrentState(currentState: { pilesData: CardData[][], pileQueueData: CardData[] }, currentQueueLayout: QueueLayout, currentScores: Record<number, number>): void {
         try {
             this.gameui.pileHandler.renderState(currentState.pilesData, currentState.pileQueueData);
 
             const gamestate = this.gameui.gamedatas.gamestate;
-            if(gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd
+            if(this.isLiveGameEnded()){ //game ended during the replay, leave the queue exactly as the live game left it
+                this.gameui.pileHandler.applyQueueLayoutSnapshot(currentQueueLayout);
+                this.gameui.pileHandler.onLeavingStateTakePiles(); //in case the replay started before takePile was left
+            } else if(gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd
                 this.gameui.pileHandler.pileQueueContainer.style.display = 'inline-block';
 
             for(let playerID in currentScores){

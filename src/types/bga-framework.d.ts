@@ -49,6 +49,7 @@ declare class GameGui {
     setupNotifications(): void;
     addTooltipHtml( nodeID: string, html: string, delay: number ):void;
     addTooltip( nodeID: string, helpString: string, actionString: string, delay?: number ):void;
+    removeTooltip( nodeID: string ):void;
     updatePageTitle(): void;
 
     placeOnObject(mobileObj: HTMLDivElement, targetObj: HTMLDivElement): void;

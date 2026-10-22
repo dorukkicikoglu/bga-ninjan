@@ -103,6 +103,10 @@ class GameBody extends GameGui {
 
                 this.pileHandler.showPossiblePiles(args.args.possible_piles);
                 break;
+
+            case 'gameEnd':
+                this.recapHandler.ensureButton(); //removes the replay button
+                break;
         }
     }
 
