@@ -158,7 +158,8 @@ class GameBody extends GameGui {
 
     public releaseNotification(){ 
         this.isAnimatingNotification = false;
-        this.notifqueue.setSynchronousDuration(0); 
+        this.notifqueue.setSynchronousDuration(0);
+        this.recapHandler.onLiveNotificationReleased();
         this.recapHandler.ensureButton();
     }
 
@@ -192,7 +193,7 @@ class GameBody extends GameGui {
         this.startAnimatingNotification();
         this.recapHandler.setRecapData(notif.args.round_recap);
         if(notif.args.round_recap)
-            this.recapHandler.markRoundSeenLive(notif.args.round_recap.round);
+            this.recapHandler.markSeenLive(notif.args.round_recap);
 
         if(notif.args.is_final_round)
             this.updateStatusText('Final round! Revealing cards...')
@@ -209,6 +210,8 @@ class GameBody extends GameGui {
 
         this.startAnimatingNotification();
         this.recapHandler.setRecapData(notif.args.round_recap);
+        if(notif.args.round_recap)
+            this.recapHandler.markSeenLive(notif.args.round_recap);
 
         if(parseInt(notif.args.new_score) == notif.args.new_score)
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);

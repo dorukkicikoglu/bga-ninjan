@@ -297,6 +297,7 @@ var GameBody = /** @class */ (function (_super) {
     GameBody.prototype.releaseNotification = function () {
         this.isAnimatingNotification = false;
         this.notifqueue.setSynchronousDuration(0);
+        this.recapHandler.onLiveNotificationReleased();
         this.recapHandler.ensureButton();
     };
     GameBody.prototype.startAnimatingNotification = function () { this.isAnimatingNotification = true; this.recapHandler.ensureButton(); };
@@ -322,7 +323,7 @@ var GameBody = /** @class */ (function (_super) {
         this.startAnimatingNotification();
         this.recapHandler.setRecapData(notif.args.round_recap);
         if (notif.args.round_recap)
-            this.recapHandler.markRoundSeenLive(notif.args.round_recap.round);
+            this.recapHandler.markSeenLive(notif.args.round_recap);
         if (notif.args.is_final_round)
             this.updateStatusText('Final round! Revealing cards...');
         setTimeout(function () { _this.pileHandler.animatePileQueue(notif.args.pile_queue_data, notif.args.auto_play); });
@@ -335,6 +336,8 @@ var GameBody = /** @class */ (function (_super) {
             return;
         this.startAnimatingNotification();
         this.recapHandler.setRecapData(notif.args.round_recap);
+        if (notif.args.round_recap)
+            this.recapHandler.markSeenLive(notif.args.round_recap);
         if (parseInt(notif.args.new_score) == notif.args.new_score)
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
         this.hideRefCard();
@@ -1320,6 +1323,18 @@ var PileHandler = /** @class */ (function () {
                 onBegin: function () { _this.pileQueueContainer.style.overflow = 'hidden'; },
                 onEnd: function () { _this.pileQueueContainer.style.display = 'none'; }
             }), fromPileAnimations]);
+        if (onComplete !== null && this.pileQueueData.length > 0) { //recap only: fit the queue to its remaining cards after each step, so restoring the current board doesn't jump. live play keeps the width until the queue empties
+            var fitQueueAnimation_1 = this.gameui.animationHandler.animateProperty({
+                node: this.pileQueueContainer,
+                duration: 400,
+                easing: 'sineOut',
+                delay: 200,
+                properties: {},
+                beforeBegin: function () { fitQueueAnimation_1.properties.width = { start: dojo.style(_this.pileQueueContainer, 'width'), end: _this.gameui.getPos(dojo.query('.remaining-cards-wrapper', _this.pileQueueContainer)[0]).w }; },
+                onEnd: function () { _this.pileQueueContainer.style.width = ''; dojo.removeAttr(_this.pileQueueContainer, 'width-set'); }
+            });
+            fromPileAnimations = dojo.fx.combine([fitQueueAnimation_1, fromPileAnimations]);
+        }
         var allAnims = dojo.fx.chain([
             liftCardAnimation,
             dojo.fx.combine([slideCardAnimation, closeQueueCardAnimation, tiltTakenCardsAnimation]),
@@ -1409,11 +1424,15 @@ var RecapHandler = /** @class */ (function () {
         this.deferredNotifs = [];
         this.replayButton = null;
         this.pageTitlePositioned = false;
+        this.pendingSeenRecap = null; //live notification that arrived while the tab was hidden
         this.ensureButton();
-        if (!this.shouldAutoplay(autoplayEligible))
+        document.addEventListener('visibilitychange', function () { _this.onVisibilityChange(); });
+        this.pruneSeenMarkers();
+        var autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
+        if (autoplaySeenSteps === undefined)
             return;
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
-        setTimeout(function () { _this.play(true); }, 500);
+        setTimeout(function () { _this.play(true, autoplaySeenSteps); }, 500);
     }
     RecapHandler.prototype.isPlaying = function () { return this.playing; };
     RecapHandler.prototype.setRecapData = function (recapData) {
@@ -1428,10 +1447,42 @@ var RecapHandler = /** @class */ (function () {
         this.deferredNotifs.push(callback);
         return true;
     };
-    RecapHandler.prototype.markRoundSeenLive = function (round) {
+    //a live reveal (no steps yet) or step counts as seen if the tab is visible when it arrives or becomes visible before its
+    //animation ends: a notification reaches a tab while another tab (the acting player's, in Studio) is in front
+    RecapHandler.prototype.markSeenLive = function (recapData) {
         if (!this.gameui.myself || this.gameui.isSpectator || this.gameui.isReplay() || this.gameui.instantaneousMode)
             return;
-        this.setSeen(round);
+        this.pendingSeenRecap = null;
+        if (document.visibilityState === 'visible') {
+            this.advanceSeenMarker(recapData);
+            return;
+        }
+        console.log('Round recap: tab hidden, seen marker waits for the tab to show before this animation ends', { round: recapData.round, steps: recapData.steps.length });
+        this.pendingSeenRecap = recapData;
+    };
+    RecapHandler.prototype.onLiveNotificationReleased = function () {
+        if (!this.pendingSeenRecap)
+            return;
+        console.log('Round recap: animation ended with the tab hidden, seen marker not advanced', { round: this.pendingSeenRecap.round, steps: this.pendingSeenRecap.steps.length });
+        this.pendingSeenRecap = null;
+    };
+    RecapHandler.prototype.onVisibilityChange = function () {
+        if (document.visibilityState !== 'visible' || !this.pendingSeenRecap)
+            return;
+        var recapData = this.pendingSeenRecap;
+        this.pendingSeenRecap = null;
+        this.advanceSeenMarker(recapData);
+    };
+    RecapHandler.prototype.advanceSeenMarker = function (recapData) {
+        var marker = this.getSeenMarker();
+        var round = Number(recapData.round);
+        var stepCount = recapData.steps.length;
+        if (stepCount == 0 ? (!marker || marker.round < round) : (marker && marker.round == round && marker.steps == stepCount - 1)) {
+            this.setSeenMarker(round, stepCount);
+            console.log('Round recap: seen marker advanced', { from: marker, to: { round: round, steps: stepCount } });
+        }
+        else
+            console.log('Round recap: seen marker not advanced, an earlier part was missed or already counted', { stored: marker, round: round, steps: stepCount });
     };
     RecapHandler.prototype.ensureButton = function () {
         var _this = this;
@@ -1451,12 +1502,12 @@ var RecapHandler = /** @class */ (function () {
             this.replayButton = dojo.create('div', { id: 'ninjan-replay-button', class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa fa-history"></i>' });
             dojo.place(this.replayButton, pageTitle, 'first');
             this.gameui.addTooltipHtml(this.replayButton.id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
-            dojo.connect(this.replayButton, 'onclick', function () { _this.play(false); });
+            dojo.connect(this.replayButton, 'onclick', function () { _this.play(false, null); });
             dojo.connect(this.replayButton, 'onkeydown', function (event) {
                 if (event.key != 'Enter' && event.key != ' ')
                     return;
                 event.preventDefault();
-                _this.play(false);
+                _this.play(false, null);
             });
         }
         var isVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification;
@@ -1476,18 +1527,55 @@ var RecapHandler = /** @class */ (function () {
         }
     };
     RecapHandler.prototype.isLiveGameEnded = function () { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); }; //archive/replay mode keeps the recap at gameEnd
-    RecapHandler.prototype.shouldAutoplay = function (autoplayEligible) {
-        if (!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded())
-            return false;
-        if (this.gameui.isReplay() || this.gameui.instantaneousMode)
-            return false;
-        return !this.isSeen(this.recapData.round);
+    //how many steps autoplay starts after: null replays the reveal too, undefined means no autoplay
+    RecapHandler.prototype.getAutoplaySeenSteps = function (autoplayEligible) {
+        if (!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded() || this.gameui.isReplay() || this.gameui.instantaneousMode) {
+            console.log('Round recap autoplay: not eligible', { autoplayEligible: autoplayEligible, hasRecap: !!this.recapData });
+            return undefined;
+        }
+        var marker = this.getSeenMarker();
+        var recap = this.recapData;
+        var recapRound = Number(recap.round);
+        var log = function (replay) { console.log('Round recap autoplay', { storedMarker: marker, recapRound: recapRound, recapSteps: recap.steps.length, replay: replay }); };
+        if (!marker || marker.round < recapRound) {
+            log('reveal and all ' + recap.steps.length + ' steps');
+            return null;
+        }
+        if (marker.round > recapRound || marker.steps >= recap.steps.length) {
+            log('nothing, already seen');
+            return undefined;
+        }
+        var lastSeenStep = marker.steps > 0 ? recap.steps[marker.steps - 1] : null;
+        var boardSource = !lastSeenStep ? 'revealed cards in the queue' : (lastSeenStep.piles_after && lastSeenStep.queue_after ? 'server snapshot' : 'steps applied to the board before the round');
+        log('steps ' + (marker.steps + 1) + ' to ' + recap.steps.length + ', starting ' + (marker.steps == 0 ? 'after the reveal' : 'after step ' + marker.steps) + ' (board: ' + boardSource + ')');
+        return marker.steps;
     };
-    RecapHandler.prototype.play = function (isAutoplay) {
+    //the board after the first stepCount steps: the server's snapshot of the last one, else the steps applied to the board before the round
+    RecapHandler.prototype.getBoardAfterSteps = function (recap, stepCount) {
+        var lastStep = stepCount > 0 ? recap.steps[stepCount - 1] : null;
+        if (lastStep && lastStep.piles_after && lastStep.queue_after)
+            return { pilesData: lastStep.piles_after, pileQueueData: lastStep.queue_after };
+        var pilesData = JSON.parse(JSON.stringify(recap.piles_before));
+        var pileQueueData = JSON.parse(JSON.stringify(recap.revealed));
+        var _loop_2 = function (step) {
+            pileQueueData = pileQueueData.filter(function (cardData) { return Number(cardData.card_id) != Number(step.card.card_id); });
+            if (step.action == 'take')
+                pilesData[step.pile_index] = [step.card];
+            else if (step.action == 'place')
+                (pilesData[step.pile_index] = pilesData[step.pile_index] || []).push(step.card);
+        };
+        for (var _i = 0, _a = recap.steps.slice(0, stepCount); _i < _a.length; _i++) {
+            var step = _a[_i];
+            _loop_2(step);
+        }
+        return { pilesData: pilesData, pileQueueData: pileQueueData };
+    };
+    RecapHandler.prototype.play = function (isAutoplay, seenSteps) {
         var _this = this;
         if (!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification || (!isAutoplay && this.isLiveGameEnded()))
             return;
         var recap = JSON.parse(JSON.stringify(this.recapData));
+        var firstStep = seenSteps === null ? 0 : seenSteps;
         var currentState = this.gameui.pileHandler.getStateSnapshot();
         var currentQueueLayout = this.gameui.pileHandler.getQueueLayoutSnapshot();
         var currentScores = {};
@@ -1496,7 +1584,7 @@ var RecapHandler = /** @class */ (function () {
             currentScores[playerID] = this.gameui.scoreCtrl[playerID] ? this.gameui.scoreCtrl[playerID].getValue() : 0;
             scoreAfterSteps[playerID] = currentScores[playerID];
         }
-        for (var _i = 0, _a = recap.steps; _i < _a.length; _i++) { //derive scores before the round from the current scores
+        for (var _i = 0, _a = recap.steps.slice(firstStep); _i < _a.length; _i++) { //derive scores before the replayed steps from the current scores
             var step = _a[_i];
             if (step.action == 'take' && scoreAfterSteps.hasOwnProperty(step.player_id))
                 scoreAfterSteps[step.player_id] -= step.taken_cards.reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
@@ -1510,7 +1598,7 @@ var RecapHandler = /** @class */ (function () {
             clearTimeout(watchdog);
             _this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
             if (isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
-                _this.setSeen(recap.round);
+                _this.setSeenMarker(recap.round, recap.steps.length);
             if (failed)
                 console.error('Round recap failed, showing current state');
             _this.finishCurrentRecap = null;
@@ -1565,9 +1653,17 @@ var RecapHandler = /** @class */ (function () {
                 if (this.gameui.scoreCtrl[playerID])
                     this.gameui.scoreCtrl[playerID].setValue(scoreAfterSteps[playerID]);
             }
-            this.gameui.pileHandler.renderState(recap.piles_before, []);
             this.gameui.updateStatusText(dojo.string.substitute(_('Replaying round ${round}...'), { round: recap.round }));
-            runAnimation(function (done) { _this.gameui.pileHandler.animatePileQueue(recap.revealed, false, done); }, function () { runStep(0); });
+            if (seenSteps === null) {
+                this.gameui.pileHandler.renderState(recap.piles_before, []);
+                runAnimation(function (done) { _this.gameui.pileHandler.animatePileQueue(recap.revealed, false, done); }, function () { runStep(0); });
+            }
+            else { //the board as it was after the last seen step, the revealed cards already in the queue
+                var board = this.getBoardAfterSteps(recap, seenSteps);
+                this.gameui.pileHandler.renderState(board.pilesData, board.pileQueueData);
+                setTimeout(function () { if (!finished)
+                    runStep(firstStep); }, this.stepGap);
+            }
         }
         catch (e) {
             console.error(e);
@@ -1602,21 +1698,56 @@ var RecapHandler = /** @class */ (function () {
         dojo.toggleClass(dojo.body(), 'round-recap-playing', playing);
         this.ensureButton();
     };
-    RecapHandler.prototype.getSeenKey = function (round) { return 'ninjan_recap_seen_' + this.gameui.table_id + '_' + this.gameui.player_id + '_' + round; };
-    RecapHandler.prototype.isSeen = function (round) {
+    RecapHandler.prototype.getSeenKey = function () { return RecapHandler.SEEN_KEY_PREFIX + this.gameui.table_id + '_' + this.gameui.player_id; };
+    RecapHandler.prototype.getSeenMarker = function () {
         try {
-            return window.localStorage.getItem(this.getSeenKey(round)) !== null;
+            var marker = JSON.parse(window.localStorage.getItem(this.getSeenKey()));
+            return marker && isFinite(marker.round) && isFinite(marker.steps) ? { round: Number(marker.round), steps: Number(marker.steps) } : null;
         }
         catch (e) {
-            return false; //localStorage unavailable, autoplay on each load
+            return null; //localStorage unavailable or unreadable, autoplay from the reveal
         }
     };
-    RecapHandler.prototype.setSeen = function (round) {
+    RecapHandler.prototype.setSeenMarker = function (round, steps) {
         try {
-            window.localStorage.setItem(this.getSeenKey(round), '1');
+            window.localStorage.setItem(this.getSeenKey(), JSON.stringify({ round: Number(round), steps: Number(steps), time: Date.now() }));
         }
         catch (e) { }
     };
+    RecapHandler.prototype.pruneSeenMarkers = function () {
+        try {
+            var currentKey = this.getSeenKey();
+            var otherMarkers = [];
+            var keysToRemove_1 = [];
+            for (var i = 0; i < window.localStorage.length; i++) {
+                var key = window.localStorage.key(i);
+                if (!key || key.indexOf(RecapHandler.SEEN_KEY_PREFIX) !== 0 || key == currentKey)
+                    continue;
+                if (/^\d+_\d+_\d+$/.test(key.substring(RecapHandler.SEEN_KEY_PREFIX.length))) {
+                    keysToRemove_1.push(key);
+                    continue;
+                }
+                var time = 0; //markers written before the time was stored count as stale
+                try {
+                    time = Number(JSON.parse(window.localStorage.getItem(key)).time) || 0;
+                }
+                catch (e) { }
+                otherMarkers.push({ key: key, time: time });
+            }
+            otherMarkers.sort(function (a, b) { return b.time - a.time; });
+            otherMarkers.forEach(function (marker, index) {
+                if (index >= RecapHandler.SEEN_MARKER_MAX_COUNT || Date.now() - marker.time > RecapHandler.SEEN_MARKER_MAX_AGE)
+                    keysToRemove_1.push(marker.key);
+            });
+            keysToRemove_1.forEach(function (key) { window.localStorage.removeItem(key); });
+            if (keysToRemove_1.length > 0)
+                console.log('Round recap: removed old seen markers', keysToRemove_1);
+        }
+        catch (e) { }
+    };
+    RecapHandler.SEEN_KEY_PREFIX = 'ninjan_recap_seen_';
+    RecapHandler.SEEN_MARKER_MAX_AGE = 30 * 24 * 60 * 60 * 1000; //other tables' markers older than 30 days are deleted
+    RecapHandler.SEEN_MARKER_MAX_COUNT = 20; //and only the newest 20 are kept
     return RecapHandler;
 }());
 var TooltipHandler = /** @class */ (function () {

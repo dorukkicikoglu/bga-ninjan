@@ -429,7 +429,7 @@ class Ninjan extends Table
             $result['recapAutoplayEligible'] = false;
         else {
             $result['lastRoundRecap'] = $this->getRoundRecap();
-            $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && $stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id);
+            $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && (($stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id)) || $stateName == 'takePile'); //takePile: every player, active or not
         }
 
         return $result;
@@ -544,13 +544,9 @@ class Ninjan extends Table
 
         $remainingHandCount = (int) $this->getUniqueValueFromDB("SELECT count(*) FROM `cards` WHERE `card_location` = 'player' AND `card_location_arg` = ".(int) $pileQueue[0]['owner_id']);
 
-        $pilesBefore = [];
-        for($i = 0; $i < PILE_COUNT; $i++)
-            $pilesBefore[$i] = $pilesBeforeRound[$i] ?? [];
-
         $roundRecap = [
             'round' => HAND_SIZE - $remainingHandCount,
-            'piles_before' => $pilesBefore,
+            'piles_before' => $this->getRecapPiles($pilesBeforeRound),
             'revealed' => $pileQueue,
             'steps' => []
         ];
@@ -564,10 +560,21 @@ class Ninjan extends Table
         if($roundRecap === null)
             return null;
 
+        $step['piles_after'] = $this->getRecapPiles($this->pileManager->getAllPiles()); //board right after this step, so the client can start a recap mid-round
+        $step['queue_after'] = $this->pileManager->getPileQueue();
+
         $roundRecap['steps'][] = $step;
         $this->globals->set('last_round_recap', $roundRecap);
 
         return $roundRecap;
+    }
+
+    function getRecapPiles($piles): array { //every pile index present, so it always reaches the client as a list
+        $recapPiles = [];
+        for($i = 0; $i < PILE_COUNT; $i++)
+            $recapPiles[$i] = $piles[$i] ?? [];
+
+        return $recapPiles;
     }
 
     function shouldEndGameEarly($pileQueue){

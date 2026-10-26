@@ -451,6 +451,19 @@ class PileHandler{
             onEnd: () => { this.pileQueueContainer.style.display = 'none'; }
         }), fromPileAnimations]);
 
+        if(onComplete !== null && this.pileQueueData.length > 0){ //recap only: fit the queue to its remaining cards after each step, so restoring the current board doesn't jump. live play keeps the width until the queue empties
+            let fitQueueAnimation = this.gameui.animationHandler.animateProperty({
+                node: this.pileQueueContainer,
+                duration: 400,
+                easing: 'sineOut',
+                delay: 200,
+                properties: {},
+                beforeBegin: () => { fitQueueAnimation.properties.width = {start: dojo.style(this.pileQueueContainer, 'width'), end: this.gameui.getPos(dojo.query('.remaining-cards-wrapper', this.pileQueueContainer)[0]).w}; },
+                onEnd: () => { this.pileQueueContainer.style.width = ''; dojo.removeAttr(this.pileQueueContainer, 'width-set'); }
+            });
+            fromPileAnimations = dojo.fx.combine([fitQueueAnimation, fromPileAnimations]);
+        }
+
         let allAnims = dojo.fx.chain([
             liftCardAnimation,
             dojo.fx.combine([slideCardAnimation, closeQueueCardAnimation, tiltTakenCardsAnimation]),

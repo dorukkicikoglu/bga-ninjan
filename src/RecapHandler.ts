@@ -1,5 +1,6 @@
-type RoundRecapStep = { player_id: number, card: CardData, action: 'take' | 'place' | 'zombie', pile_index: number | null, taken_cards: CardData[], auto: boolean };
+type RoundRecapStep = { player_id: number, card: CardData, action: 'take' | 'place' | 'zombie', pile_index: number | null, taken_cards: CardData[], auto: boolean, piles_after?: CardData[][], queue_after?: CardData[] }; //piles_after/queue_after are missing on steps recorded before they were added
 type RoundRecap = { round: number, piles_before: CardData[][], revealed: CardData[], steps: RoundRecapStep[] };
+type RecapSeenMarker = { round: number, steps: number }; //seen: the reveal of that round and its first `steps` steps
 
 class RecapHandler{
     private readonly stepTimeout: number = 10000; //fallback to current state if an animation never completes
@@ -10,15 +11,19 @@ class RecapHandler{
     private deferredNotifs: (() => void)[] = [];
     private replayButton: HTMLDivElement = null;
     private pageTitlePositioned: boolean = false;
+    private pendingSeenRecap: RoundRecap | null = null; //live notification that arrived while the tab was hidden
 
     constructor(private gameui: GameBody, private recapData: RoundRecap | null, autoplayEligible: boolean) {
         this.ensureButton();
+        document.addEventListener('visibilitychange', () => { this.onVisibilityChange(); });
+        this.pruneSeenMarkers();
 
-        if(!this.shouldAutoplay(autoplayEligible))
+        const autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
+        if(autoplaySeenSteps === undefined)
             return;
 
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
-        setTimeout(() => { this.play(true); }, 500);
+        setTimeout(() => { this.play(true, autoplaySeenSteps); }, 500);
     }
 
     public isPlaying(): boolean { return this.playing; }
@@ -39,11 +44,49 @@ class RecapHandler{
         return true;
     }
 
-    public markRoundSeenLive(round: number): void {
+    //a live reveal (no steps yet) or step counts as seen if the tab is visible when it arrives or becomes visible before its
+    //animation ends: a notification reaches a tab while another tab (the acting player's, in Studio) is in front
+    public markSeenLive(recapData: RoundRecap): void {
         if(!this.gameui.myself || this.gameui.isSpectator || this.gameui.isReplay() || this.gameui.instantaneousMode)
             return;
 
-        this.setSeen(round);
+        this.pendingSeenRecap = null;
+        if(document.visibilityState === 'visible'){
+            this.advanceSeenMarker(recapData);
+            return;
+        }
+
+        console.log('Round recap: tab hidden, seen marker waits for the tab to show before this animation ends', {round: recapData.round, steps: recapData.steps.length});
+        this.pendingSeenRecap = recapData;
+    }
+
+    public onLiveNotificationReleased(): void { //the live animation ended
+        if(!this.pendingSeenRecap)
+            return;
+
+        console.log('Round recap: animation ended with the tab hidden, seen marker not advanced', {round: this.pendingSeenRecap.round, steps: this.pendingSeenRecap.steps.length});
+        this.pendingSeenRecap = null;
+    }
+
+    private onVisibilityChange(): void {
+        if(document.visibilityState !== 'visible' || !this.pendingSeenRecap)
+            return;
+
+        const recapData = this.pendingSeenRecap;
+        this.pendingSeenRecap = null;
+        this.advanceSeenMarker(recapData);
+    }
+
+    private advanceSeenMarker(recapData: RoundRecap): void { //the marker only grows over what was seen without a gap
+        const marker = this.getSeenMarker();
+        const round = Number(recapData.round);
+        const stepCount = recapData.steps.length;
+
+        if(stepCount == 0 ? (!marker || marker.round < round) : (marker && marker.round == round && marker.steps == stepCount - 1)){
+            this.setSeenMarker(round, stepCount);
+            console.log('Round recap: seen marker advanced', {from: marker, to: {round: round, steps: stepCount}});
+        } else
+            console.log('Round recap: seen marker not advanced, an earlier part was missed or already counted', {stored: marker, round: round, steps: stepCount});
     }
 
     public ensureButton(): void { //status bar can be re-rendered by BGA, so this is called on every action button update
@@ -68,12 +111,12 @@ class RecapHandler{
             dojo.place(this.replayButton, pageTitle, 'first');
             this.gameui.addTooltipHtml(this.replayButton.id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
 
-            dojo.connect(this.replayButton, 'onclick', () => { this.play(false); });
+            dojo.connect(this.replayButton, 'onclick', () => { this.play(false, null); });
             dojo.connect(this.replayButton, 'onkeydown', (event: KeyboardEvent) => {
                 if(event.key != 'Enter' && event.key != ' ')
                     return;
                 event.preventDefault();
-                this.play(false);
+                this.play(false, null);
             });
         }
 
@@ -98,21 +141,61 @@ class RecapHandler{
 
     private isLiveGameEnded(): boolean { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); } //archive/replay mode keeps the recap at gameEnd
 
-    private shouldAutoplay(autoplayEligible: boolean): boolean {
-        if(!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded())
-            return false;
+    //how many steps autoplay starts after: null replays the reveal too, undefined means no autoplay
+    private getAutoplaySeenSteps(autoplayEligible: boolean): number | null | undefined {
+        if(!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded() || this.gameui.isReplay() || this.gameui.instantaneousMode){
+            console.log('Round recap autoplay: not eligible', {autoplayEligible: autoplayEligible, hasRecap: !!this.recapData});
+            return undefined;
+        }
 
-        if(this.gameui.isReplay() || this.gameui.instantaneousMode)
-            return false;
+        const marker = this.getSeenMarker();
+        const recap = this.recapData;
+        const recapRound = Number(recap.round);
+        const log = (replay: string) => { console.log('Round recap autoplay', {storedMarker: marker, recapRound: recapRound, recapSteps: recap.steps.length, replay: replay}); };
 
-        return !this.isSeen(this.recapData.round);
+        if(!marker || marker.round < recapRound){
+            log('reveal and all ' + recap.steps.length + ' steps');
+            return null;
+        }
+
+        if(marker.round > recapRound || marker.steps >= recap.steps.length){
+            log('nothing, already seen');
+            return undefined;
+        }
+
+        const lastSeenStep = marker.steps > 0 ? recap.steps[marker.steps - 1] : null;
+        const boardSource = !lastSeenStep ? 'revealed cards in the queue' : (lastSeenStep.piles_after && lastSeenStep.queue_after ? 'server snapshot' : 'steps applied to the board before the round');
+        log('steps ' + (marker.steps + 1) + ' to ' + recap.steps.length + ', starting ' + (marker.steps == 0 ? 'after the reveal' : 'after step ' + marker.steps) + ' (board: ' + boardSource + ')');
+        return marker.steps;
     }
 
-    private play(isAutoplay: boolean): void {
+    //the board after the first stepCount steps: the server's snapshot of the last one, else the steps applied to the board before the round
+    private getBoardAfterSteps(recap: RoundRecap, stepCount: number): { pilesData: CardData[][], pileQueueData: CardData[] } {
+        const lastStep = stepCount > 0 ? recap.steps[stepCount - 1] : null;
+        if(lastStep && lastStep.piles_after && lastStep.queue_after)
+            return { pilesData: lastStep.piles_after, pileQueueData: lastStep.queue_after };
+
+        const pilesData: CardData[][] = JSON.parse(JSON.stringify(recap.piles_before));
+        let pileQueueData: CardData[] = JSON.parse(JSON.stringify(recap.revealed));
+
+        for(let step of recap.steps.slice(0, stepCount)){ //same as the server: a taken pile is replaced by the played card, a placed card goes on the bottom, a zombie's card leaves the table
+            pileQueueData = pileQueueData.filter((cardData) => Number(cardData.card_id) != Number(step.card.card_id));
+
+            if(step.action == 'take')
+                pilesData[step.pile_index] = [step.card];
+            else if(step.action == 'place')
+                (pilesData[step.pile_index] = pilesData[step.pile_index] || []).push(step.card);
+        }
+
+        return { pilesData: pilesData, pileQueueData: pileQueueData };
+    }
+
+    private play(isAutoplay: boolean, seenSteps: number | null): void { //seenSteps: start on the board after that many steps, null replays from the reveal
         if(!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification || (!isAutoplay && this.isLiveGameEnded()))
             return;
 
         const recap: RoundRecap = JSON.parse(JSON.stringify(this.recapData));
+        const firstStep = seenSteps === null ? 0 : seenSteps;
         const currentState = this.gameui.pileHandler.getStateSnapshot();
         const currentQueueLayout = this.gameui.pileHandler.getQueueLayoutSnapshot();
         const currentScores: Record<number, number> = {};
@@ -123,7 +206,7 @@ class RecapHandler{
             scoreAfterSteps[playerID] = currentScores[playerID];
         }
 
-        for(let step of recap.steps){ //derive scores before the round from the current scores
+        for(let step of recap.steps.slice(firstStep)){ //derive scores before the replayed steps from the current scores
             if(step.action == 'take' && scoreAfterSteps.hasOwnProperty(step.player_id))
                 scoreAfterSteps[step.player_id] -= step.taken_cards.reduce((sum, cardData) => sum + Number(cardData.rank), 0);
         }
@@ -140,7 +223,7 @@ class RecapHandler{
             this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
 
             if(isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
-                this.setSeen(recap.round);
+                this.setSeenMarker(recap.round, recap.steps.length);
 
             if(failed)
                 console.error('Round recap failed, showing current state');
@@ -207,10 +290,16 @@ class RecapHandler{
                     this.gameui.scoreCtrl[playerID].setValue(scoreAfterSteps[playerID]);
             }
 
-            this.gameui.pileHandler.renderState(recap.piles_before, []);
             this.gameui.updateStatusText(dojo.string.substitute(_('Replaying round ${round}...'), {round: recap.round}));
 
-            runAnimation((done) => { this.gameui.pileHandler.animatePileQueue(recap.revealed, false, done); }, () => { runStep(0); });
+            if(seenSteps === null){
+                this.gameui.pileHandler.renderState(recap.piles_before, []);
+                runAnimation((done) => { this.gameui.pileHandler.animatePileQueue(recap.revealed, false, done); }, () => { runStep(0); });
+            } else { //the board as it was after the last seen step, the revealed cards already in the queue
+                const board = this.getBoardAfterSteps(recap, seenSteps);
+                this.gameui.pileHandler.renderState(board.pilesData, board.pileQueueData);
+                setTimeout(() => { if(!finished) runStep(firstStep); }, this.stepGap);
+            }
         } catch (e) {
             console.error(e);
             finish(true);
@@ -250,19 +339,57 @@ class RecapHandler{
         this.ensureButton();
     }
 
-    private getSeenKey(round: number): string { return 'ninjan_recap_seen_' + this.gameui.table_id + '_' + this.gameui.player_id + '_' + round; }
+    private static readonly SEEN_KEY_PREFIX = 'ninjan_recap_seen_';
+    private static readonly SEEN_MARKER_MAX_AGE = 30 * 24 * 60 * 60 * 1000; //other tables' markers older than 30 days are deleted
+    private static readonly SEEN_MARKER_MAX_COUNT = 20; //and only the newest 20 are kept
 
-    private isSeen(round: number): boolean {
+    private getSeenKey(): string { return RecapHandler.SEEN_KEY_PREFIX + this.gameui.table_id + '_' + this.gameui.player_id; }
+
+    private getSeenMarker(): RecapSeenMarker | null {
         try {
-            return window.localStorage.getItem(this.getSeenKey(round)) !== null;
+            const marker = JSON.parse(window.localStorage.getItem(this.getSeenKey()));
+            return marker && isFinite(marker.round) && isFinite(marker.steps) ? {round: Number(marker.round), steps: Number(marker.steps)} : null;
         } catch (e) {
-            return false; //localStorage unavailable, autoplay on each load
+            return null; //localStorage unavailable or unreadable, autoplay from the reveal
         }
     }
 
-    private setSeen(round: number): void {
+    private setSeenMarker(round: number, steps: number): void {
         try {
-            window.localStorage.setItem(this.getSeenKey(round), '1');
+            window.localStorage.setItem(this.getSeenKey(), JSON.stringify({round: Number(round), steps: Number(steps), time: Date.now()}));
+        } catch (e) {}
+    }
+
+    private pruneSeenMarkers(): void { //old per-round keys (<prefix><table>_<player>_<round>) go, as do other tables' stale or surplus markers
+        try {
+            const currentKey = this.getSeenKey();
+            const otherMarkers: { key: string, time: number }[] = [];
+            const keysToRemove: string[] = [];
+
+            for(let i = 0; i < window.localStorage.length; i++){
+                const key = window.localStorage.key(i);
+                if(!key || key.indexOf(RecapHandler.SEEN_KEY_PREFIX) !== 0 || key == currentKey)
+                    continue;
+
+                if(/^\d+_\d+_\d+$/.test(key.substring(RecapHandler.SEEN_KEY_PREFIX.length))){
+                    keysToRemove.push(key);
+                    continue;
+                }
+
+                let time = 0; //markers written before the time was stored count as stale
+                try { time = Number(JSON.parse(window.localStorage.getItem(key)).time) || 0; } catch (e) {}
+                otherMarkers.push({key: key, time: time});
+            }
+
+            otherMarkers.sort((a, b) => b.time - a.time);
+            otherMarkers.forEach((marker, index) => {
+                if(index >= RecapHandler.SEEN_MARKER_MAX_COUNT || Date.now() - marker.time > RecapHandler.SEEN_MARKER_MAX_AGE)
+                    keysToRemove.push(marker.key);
+            });
+
+            keysToRemove.forEach((key) => { window.localStorage.removeItem(key); });
+            if(keysToRemove.length > 0)
+                console.log('Round recap: removed old seen markers', keysToRemove);
         } catch (e) {}
     }
 }
