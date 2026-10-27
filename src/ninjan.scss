@@ -228,6 +228,7 @@ body.mobile_version{
 		i{ display: block; line-height: 1; }
 		&:hover, &:focus-visible{ opacity: 1; background-color: #ffcae780; outline: none; }
 	}
+	#ninjan-skip-recap-button i{ transform: scaleY(0.8); position: relative; top: -1px; } //shorter, same width, scales around its centre
 	&.replay-round-button-visible #maintitlebar_content{ padding-left: 48px; }
 }
 

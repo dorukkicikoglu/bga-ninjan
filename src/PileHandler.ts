@@ -5,6 +5,7 @@ class PileHandler{
     private pilesContainer: HTMLDivElement;
     public pileQueueContainer: HTMLDivElement;
     private pileContainers: Record<number, HTMLDivElement> = {};
+    public animationScope: AnimationScope | null = null; //set while a recap plays, so skipping it stops these animations
 
     constructor(private gameui: GameBody, private pilesData: CardData[][], public pileQueueData: CardData[]) { 
         this.pilesRow = dojo.query('#game_play_area .piles-row')[0];
@@ -16,6 +17,9 @@ class PileHandler{
         this.displayPiles();
         this.fillPileQueue();
     }
+
+    private track<T extends ReturnType<typeof dojo.animateProperty>>(animation: T): T { return this.animationScope ? this.animationScope.add(animation) : animation; }
+    private later(callback: () => void, delay: number = 0): void { this.animationScope ? this.animationScope.setTimeout(callback, delay) : setTimeout(callback, delay); }
 
     private displayPiles(): void {
         for(let pileIndex in this.pilesData){
@@ -33,6 +37,7 @@ class PileHandler{
 
     public renderState(pilesData: CardData[][], pileQueueData: CardData[]): void { //redraws piles and queue without animation, used by RecapHandler
         dojo.query('#page-content > .a-card, #page-content > .player-name-text, .card-to-animate-to-board').forEach(dojo.destroy); //leftover animation clones
+        dojo.query('.board-bounce').removeClass('board-bounce'); //a skipped recap can stop between the bounce's start and end
         dojo.query('.piles-container, .pile-queue-container', this.pilesRow).forEach((node) => { if(node !== this.pilesContainer && node !== this.pileQueueContainer) dojo.destroy(node); });
 
         dojo.empty(this.pilesContainer);
@@ -136,7 +141,7 @@ class PileHandler{
 
     public animatePileQueue(pileQueueDataIn: CardData[], autoPlay: boolean, onComplete: () => void = null){ //onComplete replaces releasing the notification, used by RecapHandler
         if(autoPlay){
-            setTimeout(() => { this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
+            this.later(() => { this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
             return;
         }
 
@@ -173,14 +178,14 @@ class PileHandler{
         let queueOffset = this.gameui.getPos(this.pileQueueContainer).x - this.gameui.getPos(pileQueueContainerClone).x;
 
         let expandAnimations = dojo.fx.combine([
-            this.gameui.animationHandler.animateOnObject({
+            this.track(this.gameui.animationHandler.animateOnObject({
                 node: pilesContainerClone,
                 goTo: this.pilesContainer,
                 duration: 200,
                 easing: 'sineOut',
                 onEnd: () => { this.pilesContainer.removeAttribute('style'); dojo.destroy(pilesContainerClone); }
-            }), 
-            this.gameui.animationHandler.animateProperty({
+            })), 
+            this.track(this.gameui.animationHandler.animateProperty({
                 node: pileQueueContainerClone,
                 duration: 200,
                 easing: 'sineOut',
@@ -191,7 +196,7 @@ class PileHandler{
                     marginLeft: queueOffset,
                 },
                 onEnd: () => { this.pileQueueContainer.removeAttribute('style'); queueArrows.style.cssText = ''; dojo.destroy(pileQueueContainerClone); }
-            })
+            }))
         ]);
 
         let slideAnimations = [];
@@ -219,13 +224,13 @@ class PileHandler{
                 onBeginCardAnimation = () => {
                     dojo.style(cardDivToKill, {opacity: 0});
 
-                    this.gameui.animationHandler.animateProperty({
+                    this.track(this.gameui.animationHandler.animateProperty({
                         node: cardDivToKill,
                         duration: 500, 
                         easing: 'sineInOut',
                         properties: {width: 0, marginLeft: 0},
                         onEnd: dojo.hitch(this, function(cardDivToKill){ dojo.destroy(cardDivToKill); }, cardDivToKill)
-                    }).play();
+                    })).play();
                 };
             } else {
                 cardDiv = dojo.create('div', {class: 'a-card', suit: cardData.suit, rank: cardData.rank, 'card-id': cardData.card_id, style: 'position: absolute; z-index: 3;'});
@@ -247,7 +252,7 @@ class PileHandler{
                 onBeginCardAnimation();
             }, queueCardContainer, onBeginCardAnimation);
 
-            slideAnimations.push(this.gameui.animationHandler.animateOnObject({
+            slideAnimations.push(this.track(this.gameui.animationHandler.animateOnObject({
                 node: cardDiv,
                 goTo: goTo,
                 duration: Math.min(500, (autoPlay ? 900 : 1200) / this.pileQueueData.length), //autoPlay has 900ms because delay is 600ms
@@ -257,12 +262,12 @@ class PileHandler{
                     cardDiv.removeAttribute("style");
                     dojo.place(cardDiv, goTo, 'replace');
                 }, cardDiv, goTo)
-            }));
+            })));
         }
 
         slideAnimations = dojo.fx.chain(slideAnimations);
 
-        (slideAnimations as any).onEnd = () => { setTimeout(() => { 
+        (slideAnimations as any).onEnd = () => { this.later(() => { 
             if(this.gameui.myself)
                 this.gameui.myself.hand.setHandCountAttrForMobileResizing(true); 
 
@@ -325,32 +330,32 @@ class PileHandler{
         this.gameui.placeOnObject(newPileCard, cardDiv);
         this.pilesContainer.style.zIndex = '1';
 
-        let liftCardAnimation = this.gameui.animationHandler.animateProperty({ //lift card
+        let liftCardAnimation = this.track(this.gameui.animationHandler.animateProperty({ //lift card
             node: newPileCard, 
             easing: 'sineIn',
             properties: {top: dojo.style(newPileCard, 'top') - 60, left: dojo.style(newPileCard, 'left') + Math.random() * 10 + 10},
             duration: 200,
             delay: autoPlay || this.gameui.isReplay() ? 0 : 500
-        });
+        }));
 
         let slideCardAnimation = reason != 'zombie' ?
-            this.gameui.animationHandler.animateProperty({ //slide card to pile
+            this.track(this.gameui.animationHandler.animateProperty({ //slide card to pile
                 node: newPileCard,
                 properties: {top: newCardTop, left: 0},
                 delay: 200,
                 duration: 500,
                 easing: 'sineIn',
                 onEnd: () => { this.addPileSumText(pileIndex); this.pilesContainer.style.zIndex = null; }
-            }) :
-            this.gameui.animationHandler.animateProperty({ //slide zombie card off screen
+            })) :
+            this.track(this.gameui.animationHandler.animateProperty({ //slide zombie card off screen
                 node: newPileCard,
                 properties: {top: dojo.style(newPileCard, 'top') - 60, left: -2 * this.gameui.getPos(newPileCard).w},
                 delay: 200,
                 duration: 500,
                 easing: 'sineInOut'
-        });
+        }));
 
-        let closeQueueCardAnimation = this.gameui.animationHandler.animateProperty({ //close card's prev. queue container
+        let closeQueueCardAnimation = this.track(this.gameui.animationHandler.animateProperty({ //close card's prev. queue container
             node: queueCardContainer,
             delay: 400,
             duration: 200,
@@ -367,7 +372,7 @@ class PileHandler{
                 dojo.place(playerNameTextClone, 'page-content');
                 this.gameui.placeOnObject(playerNameTextClone, playerNameText);                                    
                 dojo.destroy(playerNameText);
-                this.gameui.animationHandler.fadeOutAndDestroy(playerNameTextClone);
+                this.track(this.gameui.animationHandler.fadeOutAndDestroy(playerNameTextClone));
 
                 let secondQueueCard = dojo.query('.second-queue-card', this.pileQueueContainer);
                 if(secondQueueCard.length > 0){
@@ -382,14 +387,14 @@ class PileHandler{
                 this.pileQueueData.length <= 1 && dojo.attr(this.pileQueueContainer, 'line-hidden', 'true');
                 dojo.destroy(queueCardContainer); 
             }
-        });
+        }));
 
-        closeQueueCardAnimation = this.pileQueueData.length > 0 ? closeQueueCardAnimation : dojo.fx.combine([closeQueueCardAnimation, this.gameui.animationHandler.animateProperty({ //make queue transparent
+        closeQueueCardAnimation = this.pileQueueData.length > 0 ? closeQueueCardAnimation : dojo.fx.combine([closeQueueCardAnimation, this.track(this.gameui.animationHandler.animateProperty({ //make queue transparent
             node: this.pileQueueContainer,
             duration: 200,
             delay: 400,
             properties: { opacity: 0 },
-        })]);
+        }))]);
 
         let tiltTakenCardsAnimation = (reason == 'take') ? [] : dojo.fx.combine([]);
         if(reason == 'take'){
@@ -406,14 +411,14 @@ class PileHandler{
 
                 cardDiv.style.opacity = 0;
 
-                tiltTakenCardsAnimation.push(this.gameui.animationHandler.animateProperty({
+                tiltTakenCardsAnimation.push(this.track(this.gameui.animationHandler.animateProperty({
                     node: cardClone,
                     duration: 500,
                     properties: { marginTop: cardWidth * 0.36, marginLeft: cardWidth * 0.36},
                     easing: 'sineInOut',
                     delay: 200,
                     onBegin: () => { dojo.destroy(cardDiv); }
-                }));
+                })));
             });
             tiltTakenCardsAnimation = dojo.fx.combine(tiltTakenCardsAnimation);
         }
@@ -424,24 +429,24 @@ class PileHandler{
             let goTo = this.gameui.players[playerID].overallPlayerBoard;
 
             dojo.query('.card-to-animate-to-board').forEach((cardDiv, index) => {
-                fromPileAnimations.push(this.gameui.animationHandler.animateOnObject({
+                fromPileAnimations.push(this.track(this.gameui.animationHandler.animateOnObject({
                     node: cardDiv,
                     goTo: goTo,
                     duration: 200,
                     easing: 'sineInOut',
                     delay: index * cardDelay + 200,
-                    onEnd: () => { this.gameui.animationHandler.fadeOutAndDestroy(cardDiv); }
-                }));
+                    onEnd: () => { this.track(this.gameui.animationHandler.fadeOutAndDestroy(cardDiv)); }
+                })));
             });
 
             fromPileAnimations = dojo.fx.combine(fromPileAnimations);
             fromPileAnimations.onEnd = () => { 
-                setTimeout(() => { dojo.addClass(goTo, 'board-bounce'); }, 80);
-                setTimeout(() => { dojo.removeClass(goTo, 'board-bounce'); }, 430);
+                this.later(() => { dojo.addClass(goTo, 'board-bounce'); }, 80);
+                this.later(() => { dojo.removeClass(goTo, 'board-bounce'); }, 430);
             }
         }
 
-        fromPileAnimations = this.pileQueueData.length > 0 ? fromPileAnimations : dojo.fx.combine([this.gameui.animationHandler.animateProperty({ //shrink queue
+        fromPileAnimations = this.pileQueueData.length > 0 ? fromPileAnimations : dojo.fx.combine([this.track(this.gameui.animationHandler.animateProperty({ //shrink queue
             node: this.pileQueueContainer,
             duration: 400,
             easing: 'sineOut',
@@ -449,10 +454,10 @@ class PileHandler{
             properties: this.gameui.isDesktop() ? { width: 0, marginRight: 0 } : { height: 0, marginBottom: 0 },
             onBegin: () => { this.pileQueueContainer.style.overflow = 'hidden'; },
             onEnd: () => { this.pileQueueContainer.style.display = 'none'; }
-        }), fromPileAnimations]);
+        })), fromPileAnimations]);
 
         if(onComplete !== null && this.pileQueueData.length > 0){ //recap only: fit the queue to its remaining cards after each step, so restoring the current board doesn't jump. live play keeps the width until the queue empties
-            let fitQueueAnimation = this.gameui.animationHandler.animateProperty({
+            let fitQueueAnimation = this.track(this.gameui.animationHandler.animateProperty({
                 node: this.pileQueueContainer,
                 duration: 400,
                 easing: 'sineOut',
@@ -460,7 +465,7 @@ class PileHandler{
                 properties: {},
                 beforeBegin: () => { fitQueueAnimation.properties.width = {start: dojo.style(this.pileQueueContainer, 'width'), end: this.gameui.getPos(dojo.query('.remaining-cards-wrapper', this.pileQueueContainer)[0]).w}; },
                 onEnd: () => { this.pileQueueContainer.style.width = ''; dojo.removeAttr(this.pileQueueContainer, 'width-set'); }
-            });
+            }));
             fromPileAnimations = dojo.fx.combine([fitQueueAnimation, fromPileAnimations]);
         }
 
@@ -478,9 +483,9 @@ class PileHandler{
             
             this.gameui.tooltipHandler.addTooltipToCards();
 
-            setTimeout(() => { onComplete ? onComplete() : this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
+            this.later(() => { onComplete ? onComplete() : this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
         }
 
-        setTimeout(() => { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);                
+        this.later(() => { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);                
     }
 }

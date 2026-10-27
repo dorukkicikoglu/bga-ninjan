@@ -68,5 +68,35 @@ class AnimationHandler{
         return args;
     }
 
-    public fadeOutAndDestroy(node: HTMLDivElement): void{ dojo.animateProperty({ node: node, properties: {opacity: 0}, duration: 300, onEnd: () => { dojo.destroy(node); } }).play(); }
+    public fadeOutAndDestroy(node: HTMLDivElement): ReturnType<typeof dojo.animateProperty>{ return dojo.animateProperty({ node: node, properties: {opacity: 0}, duration: 300, onEnd: () => { dojo.destroy(node); } }).play(); }
+}
+
+class AnimationScope{ //collects a recap's animations and timeouts so skipping it can stop all of them at once
+    private animations: ReturnType<typeof dojo.animateProperty>[] = [];
+    private timeouts: number[] = [];
+    private stopped: boolean = false;
+
+    public add<T extends ReturnType<typeof dojo.animateProperty>>(animation: T): T {
+        this.stopped ? this.neutralize(animation) : this.animations.push(animation);
+        return animation;
+    }
+
+    public setTimeout(callback: () => void, delay: number): number {
+        const timeout = window.setTimeout(callback, delay);
+        this.stopped ? clearTimeout(timeout) : this.timeouts.push(timeout);
+        return timeout;
+    }
+
+    public stop(): void { //stopped animations don't fire onEnd, so the combines and chains holding them never continue
+        this.stopped = true;
+        this.timeouts.forEach((timeout) => { clearTimeout(timeout); });
+        this.animations.forEach((animation) => { this.neutralize(animation); });
+        this.timeouts = [];
+        this.animations = [];
+    }
+
+    private neutralize(animation: ReturnType<typeof dojo.animateProperty>): void {
+        animation.play = () => animation; //a chain or combine may still try to start it
+        animation.stop();
+    }
 }

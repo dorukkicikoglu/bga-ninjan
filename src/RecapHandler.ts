@@ -7,9 +7,11 @@ class RecapHandler{
     private readonly stepGap: number = 300;
 
     private playing: boolean = false;
-    private finishCurrentRecap: ((failed: boolean) => void) | null = null;
+    private finishCurrentRecap: ((outcome: 'done' | 'failed' | 'skipped') => void) | null = null;
+    private pendingAutoplay: number | null = null; //autoplay waits for the interface to settle
     private deferredNotifs: (() => void)[] = [];
     private replayButton: HTMLDivElement = null;
+    private skipButton: HTMLDivElement = null;
     private pageTitlePositioned: boolean = false;
     private pendingSeenRecap: RoundRecap | null = null; //live notification that arrived while the tab was hidden
 
@@ -23,7 +25,7 @@ class RecapHandler{
             return;
 
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
-        setTimeout(() => { this.play(true, autoplaySeenSteps); }, 500);
+        this.pendingAutoplay = setTimeout(() => { this.pendingAutoplay = null; this.play(true, autoplaySeenSteps); }, 500);
     }
 
     public isPlaying(): boolean { return this.playing; }
@@ -94,49 +96,89 @@ class RecapHandler{
         if(!pageTitle)
             return;
 
-        if(this.isLiveGameEnded()){ //no recap once the game has ended, a running replay is left to finish and restore the final board
-            this.removeButton(pageTitle);
+        if(this.isLiveGameEnded() && !this.playing){ //no recap once the game has ended, a running replay keeps its skip button until it restored the final board
+            this.removeButtons(pageTitle);
             return;
         }
 
-        if(!this.replayButton || !pageTitle.contains(this.replayButton)){
-            const label = _('Replay last round');
+        if(!this.replayButton || !pageTitle.contains(this.replayButton))
+            this.replayButton = this.createButton(pageTitle, 'ninjan-replay-button', _('Replay last round'), 'fa-history', () => { this.play(false, null); });
+        if(!this.skipButton || !pageTitle.contains(this.skipButton))
+            this.skipButton = this.createButton(pageTitle, 'ninjan-skip-recap-button', _('Skip recap'), 'fa-step-forward', () => { this.skip(); });
 
-            if(getComputedStyle(pageTitle).position == 'static'){
-                pageTitle.style.position = 'relative';
-                this.pageTitlePositioned = true;
-            }
-
-            this.replayButton = dojo.create('div', {id: 'ninjan-replay-button', class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa fa-history"></i>'});
-            dojo.place(this.replayButton, pageTitle, 'first');
-            this.gameui.addTooltipHtml(this.replayButton.id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
-
-            dojo.connect(this.replayButton, 'onclick', () => { this.play(false, null); });
-            dojo.connect(this.replayButton, 'onkeydown', (event: KeyboardEvent) => {
-                if(event.key != 'Enter' && event.key != ' ')
-                    return;
-                event.preventDefault();
-                this.play(false, null);
-            });
-        }
-
-        let isVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification;
-        this.replayButton.style.display = isVisible ? '' : 'none';
-        dojo.toggleClass(pageTitle, 'replay-round-button-visible', isVisible);
+        const isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification && !this.isLiveGameEnded();
+        this.replayButton.style.display = isReplayVisible ? '' : 'none';
+        this.skipButton.style.display = this.playing ? '' : 'none';
+        dojo.toggleClass(pageTitle, 'replay-round-button-visible', isReplayVisible || this.playing);
     }
 
-    private removeButton(pageTitle: HTMLDivElement): void {
-        if(this.replayButton){
-            this.gameui.removeTooltip(this.replayButton.id);
-            dojo.destroy(this.replayButton);
-            this.replayButton = null;
+    private createButton(pageTitle: HTMLDivElement, id: string, label: string, icon: string, onClick: () => void): HTMLDivElement { //both buttons share the spot at the left of the status bar
+        if(getComputedStyle(pageTitle).position == 'static'){
+            pageTitle.style.position = 'relative';
+            this.pageTitlePositioned = true;
         }
+
+        const button: HTMLDivElement = dojo.create('div', {id: id, class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa ' + icon + '"></i>'});
+        dojo.place(button, pageTitle, 'first');
+        this.gameui.addTooltipHtml(id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
+
+        const click = () => {
+            if(this.gameui.tooltips[id]) //the button hides under the cursor, so its tooltip wouldn't get a mouseleave
+                this.gameui.tooltips[id].close();
+            onClick();
+        };
+        dojo.connect(button, 'onclick', click);
+        dojo.connect(button, 'onkeydown', (event: KeyboardEvent) => {
+            if(event.key != 'Enter' && event.key != ' ')
+                return;
+            event.preventDefault();
+            click();
+        });
+
+        return button;
+    }
+
+    private removeButtons(pageTitle: HTMLDivElement): void {
+        for(const button of [this.replayButton, this.skipButton]){
+            if(!button)
+                continue;
+            this.gameui.removeTooltip(button.id);
+            dojo.destroy(button);
+        }
+        this.replayButton = null;
+        this.skipButton = null;
 
         dojo.removeClass(pageTitle, 'replay-round-button-visible');
         if(this.pageTitlePositioned){
             pageTitle.style.position = '';
             this.pageTitlePositioned = false;
         }
+    }
+
+    private skip(): void { //jumps to the current game position and counts the recap as seen
+        if(this.finishCurrentRecap){
+            this.finishCurrentRecap('skipped');
+            return;
+        }
+
+        if(!this.playing)
+            return;
+
+        clearTimeout(this.pendingAutoplay); //skipped before the autoplay drew anything
+        this.pendingAutoplay = null;
+        if(this.recapData){
+            this.setSeenMarker(this.recapData.round, this.recapData.steps.length);
+            console.log('Round recap: skipped before it started', {round: this.recapData.round, steps: this.recapData.steps.length});
+        }
+        this.endPlaying();
+    }
+
+    private endPlaying(): void { //lets the live notifications that waited for the recap run
+        this.setPlaying(false);
+
+        const deferredNotifs = this.deferredNotifs;
+        this.deferredNotifs = [];
+        deferredNotifs.forEach((callback) => { callback(); });
     }
 
     private isLiveGameEnded(): boolean { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); } //archive/replay mode keeps the recap at gameEnd
@@ -213,27 +255,28 @@ class RecapHandler{
 
         let finished = false;
         let watchdog: number = null;
+        const animationScope = new AnimationScope();
 
-        const finish = (failed: boolean) => {
+        const finish = (outcome: 'done' | 'failed' | 'skipped') => {
             if(finished)
                 return;
             finished = true;
             clearTimeout(watchdog);
+            animationScope.stop(); //nothing of the recap keeps animating or fires later, the restore redraws whatever it left midway
+            this.gameui.pileHandler.animationScope = null;
 
             this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
 
-            if(isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
+            if(isAutoplay || outcome == 'skipped') //set even after a failure so a broken recap doesn't autoplay on every load
                 this.setSeenMarker(recap.round, recap.steps.length);
 
-            if(failed)
+            if(outcome == 'failed')
                 console.error('Round recap failed, showing current state');
+            else if(outcome == 'skipped')
+                console.log('Round recap: skipped', {round: recap.round, steps: recap.steps.length});
 
             this.finishCurrentRecap = null;
-            this.setPlaying(false);
-
-            const deferredNotifs = this.deferredNotifs;
-            this.deferredNotifs = [];
-            deferredNotifs.forEach((callback) => { callback(); });
+            this.endPlaying();
         };
         this.finishCurrentRecap = finish;
 
@@ -242,7 +285,7 @@ class RecapHandler{
                 return;
 
             clearTimeout(watchdog);
-            watchdog = setTimeout(() => { finish(true); }, this.stepTimeout);
+            watchdog = setTimeout(() => { finish('failed'); }, this.stepTimeout);
 
             let isDone = false;
             const done = () => {
@@ -250,20 +293,20 @@ class RecapHandler{
                     return;
                 isDone = true;
                 clearTimeout(watchdog);
-                setTimeout(() => { if(!finished) next(); }, this.stepGap);
+                animationScope.setTimeout(() => { if(!finished) next(); }, this.stepGap);
             };
 
             try {
                 animate(done);
             } catch (e) {
                 console.error(e);
-                finish(true);
+                finish('failed');
             }
         };
 
         const runStep = (stepIndex: number) => {
             if(stepIndex >= recap.steps.length){
-                finish(false);
+                finish('done');
                 return;
             }
 
@@ -283,6 +326,7 @@ class RecapHandler{
         };
 
         try {
+            this.gameui.pileHandler.animationScope = animationScope;
             this.setPlaying(true);
 
             for(let playerID in scoreAfterSteps){
@@ -298,11 +342,11 @@ class RecapHandler{
             } else { //the board as it was after the last seen step, the revealed cards already in the queue
                 const board = this.getBoardAfterSteps(recap, seenSteps);
                 this.gameui.pileHandler.renderState(board.pilesData, board.pileQueueData);
-                setTimeout(() => { if(!finished) runStep(firstStep); }, this.stepGap);
+                animationScope.setTimeout(() => { if(!finished) runStep(firstStep); }, this.stepGap);
             }
         } catch (e) {
             console.error(e);
-            finish(true);
+            finish('failed');
         }
     }
 

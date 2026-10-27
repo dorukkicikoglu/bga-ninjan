@@ -664,8 +664,8 @@ body.mobile_version {
   height: 40px;
   border-radius: 50%;
   font-size: 30px;
-  color: #6f1f13;
-  opacity: 0.55;
+  color: #621f1f;
+  opacity: 0.75;
   cursor: pointer;
   transition: opacity 0.2s, background-color 0.2s;
   -webkit-touch-callout: none;
@@ -683,6 +683,11 @@ body.mobile_version {
   opacity: 1;
   background-color: rgba(255, 202, 231, 0.5019607843);
   outline: none;
+}
+#page-title #ninjan-skip-recap-button i {
+  transform: scaleY(0.8);
+  position: relative;
+  top: -1px;
 }
 #page-title.replay-round-button-visible #maintitlebar_content {
   padding-left: 48px;

@@ -55,8 +55,37 @@ var AnimationHandler = /** @class */ (function () {
             delete args.easing;
         return args;
     };
-    AnimationHandler.prototype.fadeOutAndDestroy = function (node) { dojo.animateProperty({ node: node, properties: { opacity: 0 }, duration: 300, onEnd: function () { dojo.destroy(node); } }).play(); };
+    AnimationHandler.prototype.fadeOutAndDestroy = function (node) { return dojo.animateProperty({ node: node, properties: { opacity: 0 }, duration: 300, onEnd: function () { dojo.destroy(node); } }).play(); };
     return AnimationHandler;
+}());
+var AnimationScope = /** @class */ (function () {
+    function AnimationScope() {
+        this.animations = [];
+        this.timeouts = [];
+        this.stopped = false;
+    }
+    AnimationScope.prototype.add = function (animation) {
+        this.stopped ? this.neutralize(animation) : this.animations.push(animation);
+        return animation;
+    };
+    AnimationScope.prototype.setTimeout = function (callback, delay) {
+        var timeout = window.setTimeout(callback, delay);
+        this.stopped ? clearTimeout(timeout) : this.timeouts.push(timeout);
+        return timeout;
+    };
+    AnimationScope.prototype.stop = function () {
+        var _this = this;
+        this.stopped = true;
+        this.timeouts.forEach(function (timeout) { clearTimeout(timeout); });
+        this.animations.forEach(function (animation) { _this.neutralize(animation); });
+        this.timeouts = [];
+        this.animations = [];
+    };
+    AnimationScope.prototype.neutralize = function (animation) {
+        animation.play = function () { return animation; }; //a chain or combine may still try to start it
+        animation.stop();
+    };
+    return AnimationScope;
 }());
 var BackgroundHandler = /** @class */ (function () {
     function BackgroundHandler(gameui) {
@@ -954,6 +983,7 @@ var PileHandler = /** @class */ (function () {
         this.pilesData = pilesData;
         this.pileQueueData = pileQueueData;
         this.pileContainers = {};
+        this.animationScope = null; //set while a recap plays, so skipping it stops these animations
         this.pilesRow = dojo.query('#game_play_area .piles-row')[0];
         this.pilesContainer = dojo.query('#game_play_area .piles-container')[0];
         this.pileQueueContainer = dojo.query('#game_play_area .pile-queue-container')[0];
@@ -961,6 +991,11 @@ var PileHandler = /** @class */ (function () {
         this.displayPiles();
         this.fillPileQueue();
     }
+    PileHandler.prototype.track = function (animation) { return this.animationScope ? this.animationScope.add(animation) : animation; };
+    PileHandler.prototype.later = function (callback, delay) {
+        if (delay === void 0) { delay = 0; }
+        this.animationScope ? this.animationScope.setTimeout(callback, delay) : setTimeout(callback, delay);
+    };
     PileHandler.prototype.displayPiles = function () {
         for (var pileIndex in this.pilesData) {
             var pileContainer = dojo.place(dojo.string.substitute(this.gameui.jstpl_pile_container, { pileIndex: pileIndex }), this.pilesContainer);
@@ -976,6 +1011,7 @@ var PileHandler = /** @class */ (function () {
     PileHandler.prototype.renderState = function (pilesData, pileQueueData) {
         var _this = this;
         dojo.query('#page-content > .a-card, #page-content > .player-name-text, .card-to-animate-to-board').forEach(dojo.destroy); //leftover animation clones
+        dojo.query('.board-bounce').removeClass('board-bounce'); //a skipped recap can stop between the bounce's start and end
         dojo.query('.piles-container, .pile-queue-container', this.pilesRow).forEach(function (node) { if (node !== _this.pilesContainer && node !== _this.pileQueueContainer)
             dojo.destroy(node); });
         dojo.empty(this.pilesContainer);
@@ -1059,7 +1095,7 @@ var PileHandler = /** @class */ (function () {
         var _this = this;
         if (onComplete === void 0) { onComplete = null; }
         if (autoPlay) {
-            setTimeout(function () { _this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
+            this.later(function () { _this.animatePileQueue(pileQueueDataIn, false, onComplete); }, 600); //autoPlay delay is 600ms so slideAnimations happens in max 900ms
             return;
         }
         this.pileQueueData = pileQueueDataIn;
@@ -1086,14 +1122,14 @@ var PileHandler = /** @class */ (function () {
         this.pileQueueContainer.style.opacity = '0';
         var queueOffset = this.gameui.getPos(this.pileQueueContainer).x - this.gameui.getPos(pileQueueContainerClone).x;
         var expandAnimations = dojo.fx.combine([
-            this.gameui.animationHandler.animateOnObject({
+            this.track(this.gameui.animationHandler.animateOnObject({
                 node: pilesContainerClone,
                 goTo: this.pilesContainer,
                 duration: 200,
                 easing: 'sineOut',
                 onEnd: function () { _this.pilesContainer.removeAttribute('style'); dojo.destroy(pilesContainerClone); }
-            }),
-            this.gameui.animationHandler.animateProperty({
+            })),
+            this.track(this.gameui.animationHandler.animateProperty({
                 node: pileQueueContainerClone,
                 duration: 200,
                 easing: 'sineOut',
@@ -1104,7 +1140,7 @@ var PileHandler = /** @class */ (function () {
                     marginLeft: queueOffset,
                 },
                 onEnd: function () { _this.pileQueueContainer.removeAttribute('style'); queueArrows.style.cssText = ''; dojo.destroy(pileQueueContainerClone); }
-            })
+            }))
         ]);
         var slideAnimations = [];
         var queueCardContainers = dojo.query('.a-queue-card-container', this.pileQueueContainer);
@@ -1123,13 +1159,13 @@ var PileHandler = /** @class */ (function () {
                 this_1.gameui.placeOnObject(cardDiv, cardDivToKill_1);
                 onBeginCardAnimation = function () {
                     dojo.style(cardDivToKill_1, { opacity: 0 });
-                    _this.gameui.animationHandler.animateProperty({
+                    _this.track(_this.gameui.animationHandler.animateProperty({
                         node: cardDivToKill_1,
                         duration: 500,
                         easing: 'sineInOut',
                         properties: { width: 0, marginLeft: 0 },
                         onEnd: dojo.hitch(_this, function (cardDivToKill) { dojo.destroy(cardDivToKill); }, cardDivToKill_1)
-                    }).play();
+                    })).play();
                 };
             }
             else {
@@ -1147,7 +1183,7 @@ var PileHandler = /** @class */ (function () {
                 dojo.query('.player-name-text', queueCardContainer)[0].style.opacity = 1;
                 onBeginCardAnimation();
             }, queueCardContainer, onBeginCardAnimation);
-            slideAnimations.push(this_1.gameui.animationHandler.animateOnObject({
+            slideAnimations.push(this_1.track(this_1.gameui.animationHandler.animateOnObject({
                 node: cardDiv,
                 goTo: goTo,
                 duration: Math.min(500, (autoPlay ? 900 : 1200) / this_1.pileQueueData.length), //autoPlay has 900ms because delay is 600ms
@@ -1157,7 +1193,7 @@ var PileHandler = /** @class */ (function () {
                     cardDiv.removeAttribute("style");
                     dojo.place(cardDiv, goTo, 'replace');
                 }, cardDiv, goTo)
-            }));
+            })));
         };
         var this_1 = this;
         for (var cardIndex in this.pileQueueData) {
@@ -1165,7 +1201,7 @@ var PileHandler = /** @class */ (function () {
         }
         slideAnimations = dojo.fx.chain(slideAnimations);
         slideAnimations.onEnd = function () {
-            setTimeout(function () {
+            _this.later(function () {
                 if (_this.gameui.myself)
                     _this.gameui.myself.hand.setHandCountAttrForMobileResizing(true);
                 _this.gameui.tooltipHandler.addNewPlayedCard(_this.pileQueueData);
@@ -1213,30 +1249,30 @@ var PileHandler = /** @class */ (function () {
         dojo.place(newPileCard, reason != 'zombie' ? pileContainer : 'page-content');
         this.gameui.placeOnObject(newPileCard, cardDiv);
         this.pilesContainer.style.zIndex = '1';
-        var liftCardAnimation = this.gameui.animationHandler.animateProperty({
+        var liftCardAnimation = this.track(this.gameui.animationHandler.animateProperty({
             node: newPileCard,
             easing: 'sineIn',
             properties: { top: dojo.style(newPileCard, 'top') - 60, left: dojo.style(newPileCard, 'left') + Math.random() * 10 + 10 },
             duration: 200,
             delay: autoPlay || this.gameui.isReplay() ? 0 : 500
-        });
+        }));
         var slideCardAnimation = reason != 'zombie' ?
-            this.gameui.animationHandler.animateProperty({
+            this.track(this.gameui.animationHandler.animateProperty({
                 node: newPileCard,
                 properties: { top: newCardTop, left: 0 },
                 delay: 200,
                 duration: 500,
                 easing: 'sineIn',
                 onEnd: function () { _this.addPileSumText(pileIndex); _this.pilesContainer.style.zIndex = null; }
-            }) :
-            this.gameui.animationHandler.animateProperty({
+            })) :
+            this.track(this.gameui.animationHandler.animateProperty({
                 node: newPileCard,
                 properties: { top: dojo.style(newPileCard, 'top') - 60, left: -2 * this.gameui.getPos(newPileCard).w },
                 delay: 200,
                 duration: 500,
                 easing: 'sineInOut'
-            });
-        var closeQueueCardAnimation = this.gameui.animationHandler.animateProperty({
+            }));
+        var closeQueueCardAnimation = this.track(this.gameui.animationHandler.animateProperty({
             node: queueCardContainer,
             delay: 400,
             duration: 200,
@@ -1252,7 +1288,7 @@ var PileHandler = /** @class */ (function () {
                 dojo.place(playerNameTextClone, 'page-content');
                 _this.gameui.placeOnObject(playerNameTextClone, playerNameText);
                 dojo.destroy(playerNameText);
-                _this.gameui.animationHandler.fadeOutAndDestroy(playerNameTextClone);
+                _this.track(_this.gameui.animationHandler.fadeOutAndDestroy(playerNameTextClone));
                 var secondQueueCard = dojo.query('.second-queue-card', _this.pileQueueContainer);
                 if (secondQueueCard.length > 0) {
                     secondQueueCard = secondQueueCard[0];
@@ -1265,13 +1301,13 @@ var PileHandler = /** @class */ (function () {
                 _this.pileQueueData.length <= 1 && dojo.attr(_this.pileQueueContainer, 'line-hidden', 'true');
                 dojo.destroy(queueCardContainer);
             }
-        });
-        closeQueueCardAnimation = this.pileQueueData.length > 0 ? closeQueueCardAnimation : dojo.fx.combine([closeQueueCardAnimation, this.gameui.animationHandler.animateProperty({
+        }));
+        closeQueueCardAnimation = this.pileQueueData.length > 0 ? closeQueueCardAnimation : dojo.fx.combine([closeQueueCardAnimation, this.track(this.gameui.animationHandler.animateProperty({
                 node: this.pileQueueContainer,
                 duration: 200,
                 delay: 400,
                 properties: { opacity: 0 },
-            })]);
+            }))]);
         var tiltTakenCardsAnimation = (reason == 'take') ? [] : dojo.fx.combine([]);
         if (reason == 'take') {
             tiltTakenCardsAnimation = [];
@@ -1283,14 +1319,14 @@ var PileHandler = /** @class */ (function () {
                 dojo.place(cardClone, 'page-content');
                 _this.gameui.placeOnObject(cardClone, cardDiv);
                 cardDiv.style.opacity = 0;
-                tiltTakenCardsAnimation.push(_this.gameui.animationHandler.animateProperty({
+                tiltTakenCardsAnimation.push(_this.track(_this.gameui.animationHandler.animateProperty({
                     node: cardClone,
                     duration: 500,
                     properties: { marginTop: cardWidth_1 * 0.36, marginLeft: cardWidth_1 * 0.36 },
                     easing: 'sineInOut',
                     delay: 200,
                     onBegin: function () { dojo.destroy(cardDiv); }
-                }));
+                })));
             });
             tiltTakenCardsAnimation = dojo.fx.combine(tiltTakenCardsAnimation);
         }
@@ -1299,22 +1335,22 @@ var PileHandler = /** @class */ (function () {
             var cardDelay_1 = Math.max(50, Math.min(120, 300 / pileCards.length));
             var goTo_1 = this.gameui.players[playerID].overallPlayerBoard;
             dojo.query('.card-to-animate-to-board').forEach(function (cardDiv, index) {
-                fromPileAnimations.push(_this.gameui.animationHandler.animateOnObject({
+                fromPileAnimations.push(_this.track(_this.gameui.animationHandler.animateOnObject({
                     node: cardDiv,
                     goTo: goTo_1,
                     duration: 200,
                     easing: 'sineInOut',
                     delay: index * cardDelay_1 + 200,
-                    onEnd: function () { _this.gameui.animationHandler.fadeOutAndDestroy(cardDiv); }
-                }));
+                    onEnd: function () { _this.track(_this.gameui.animationHandler.fadeOutAndDestroy(cardDiv)); }
+                })));
             });
             fromPileAnimations = dojo.fx.combine(fromPileAnimations);
             fromPileAnimations.onEnd = function () {
-                setTimeout(function () { dojo.addClass(goTo_1, 'board-bounce'); }, 80);
-                setTimeout(function () { dojo.removeClass(goTo_1, 'board-bounce'); }, 430);
+                _this.later(function () { dojo.addClass(goTo_1, 'board-bounce'); }, 80);
+                _this.later(function () { dojo.removeClass(goTo_1, 'board-bounce'); }, 430);
             };
         }
-        fromPileAnimations = this.pileQueueData.length > 0 ? fromPileAnimations : dojo.fx.combine([this.gameui.animationHandler.animateProperty({
+        fromPileAnimations = this.pileQueueData.length > 0 ? fromPileAnimations : dojo.fx.combine([this.track(this.gameui.animationHandler.animateProperty({
                 node: this.pileQueueContainer,
                 duration: 400,
                 easing: 'sineOut',
@@ -1322,9 +1358,9 @@ var PileHandler = /** @class */ (function () {
                 properties: this.gameui.isDesktop() ? { width: 0, marginRight: 0 } : { height: 0, marginBottom: 0 },
                 onBegin: function () { _this.pileQueueContainer.style.overflow = 'hidden'; },
                 onEnd: function () { _this.pileQueueContainer.style.display = 'none'; }
-            }), fromPileAnimations]);
+            })), fromPileAnimations]);
         if (onComplete !== null && this.pileQueueData.length > 0) { //recap only: fit the queue to its remaining cards after each step, so restoring the current board doesn't jump. live play keeps the width until the queue empties
-            var fitQueueAnimation_1 = this.gameui.animationHandler.animateProperty({
+            var fitQueueAnimation_1 = this.track(this.gameui.animationHandler.animateProperty({
                 node: this.pileQueueContainer,
                 duration: 400,
                 easing: 'sineOut',
@@ -1332,7 +1368,7 @@ var PileHandler = /** @class */ (function () {
                 properties: {},
                 beforeBegin: function () { fitQueueAnimation_1.properties.width = { start: dojo.style(_this.pileQueueContainer, 'width'), end: _this.gameui.getPos(dojo.query('.remaining-cards-wrapper', _this.pileQueueContainer)[0]).w }; },
                 onEnd: function () { _this.pileQueueContainer.style.width = ''; dojo.removeAttr(_this.pileQueueContainer, 'width-set'); }
-            });
+            }));
             fromPileAnimations = dojo.fx.combine([fitQueueAnimation_1, fromPileAnimations]);
         }
         var allAnims = dojo.fx.chain([
@@ -1347,9 +1383,9 @@ var PileHandler = /** @class */ (function () {
             else
                 dojo.destroy(newPileCard);
             _this.gameui.tooltipHandler.addTooltipToCards();
-            setTimeout(function () { onComplete ? onComplete() : _this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
+            _this.later(function () { onComplete ? onComplete() : _this.gameui.releaseNotification(); }, autoPlay ? 300 : 0);
         };
-        setTimeout(function () { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);
+        this.later(function () { allAnims.play(); }, autoPlay && this.gameui.isReplay() ? 0 : 300);
     };
     return PileHandler;
 }());
@@ -1421,8 +1457,10 @@ var RecapHandler = /** @class */ (function () {
         this.stepGap = 300;
         this.playing = false;
         this.finishCurrentRecap = null;
+        this.pendingAutoplay = null; //autoplay waits for the interface to settle
         this.deferredNotifs = [];
         this.replayButton = null;
+        this.skipButton = null;
         this.pageTitlePositioned = false;
         this.pendingSeenRecap = null; //live notification that arrived while the tab was hidden
         this.ensureButton();
@@ -1432,7 +1470,7 @@ var RecapHandler = /** @class */ (function () {
         if (autoplaySeenSteps === undefined)
             return;
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
-        setTimeout(function () { _this.play(true, autoplaySeenSteps); }, 500);
+        this.pendingAutoplay = setTimeout(function () { _this.pendingAutoplay = null; _this.play(true, autoplaySeenSteps); }, 500);
     }
     RecapHandler.prototype.isPlaying = function () { return this.playing; };
     RecapHandler.prototype.setRecapData = function (recapData) {
@@ -1489,42 +1527,78 @@ var RecapHandler = /** @class */ (function () {
         var pageTitle = $('page-title');
         if (!pageTitle)
             return;
-        if (this.isLiveGameEnded()) { //no recap once the game has ended, a running replay is left to finish and restore the final board
-            this.removeButton(pageTitle);
+        if (this.isLiveGameEnded() && !this.playing) { //no recap once the game has ended, a running replay keeps its skip button until it restored the final board
+            this.removeButtons(pageTitle);
             return;
         }
-        if (!this.replayButton || !pageTitle.contains(this.replayButton)) {
-            var label = _('Replay last round');
-            if (getComputedStyle(pageTitle).position == 'static') {
-                pageTitle.style.position = 'relative';
-                this.pageTitlePositioned = true;
-            }
-            this.replayButton = dojo.create('div', { id: 'ninjan-replay-button', class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa fa-history"></i>' });
-            dojo.place(this.replayButton, pageTitle, 'first');
-            this.gameui.addTooltipHtml(this.replayButton.id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
-            dojo.connect(this.replayButton, 'onclick', function () { _this.play(false, null); });
-            dojo.connect(this.replayButton, 'onkeydown', function (event) {
-                if (event.key != 'Enter' && event.key != ' ')
-                    return;
-                event.preventDefault();
-                _this.play(false, null);
-            });
-        }
-        var isVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification;
-        this.replayButton.style.display = isVisible ? '' : 'none';
-        dojo.toggleClass(pageTitle, 'replay-round-button-visible', isVisible);
+        if (!this.replayButton || !pageTitle.contains(this.replayButton))
+            this.replayButton = this.createButton(pageTitle, 'ninjan-replay-button', _('Replay last round'), 'fa-history', function () { _this.play(false, null); });
+        if (!this.skipButton || !pageTitle.contains(this.skipButton))
+            this.skipButton = this.createButton(pageTitle, 'ninjan-skip-recap-button', _('Skip recap'), 'fa-step-forward', function () { _this.skip(); });
+        var isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification && !this.isLiveGameEnded();
+        this.replayButton.style.display = isReplayVisible ? '' : 'none';
+        this.skipButton.style.display = this.playing ? '' : 'none';
+        dojo.toggleClass(pageTitle, 'replay-round-button-visible', isReplayVisible || this.playing);
     };
-    RecapHandler.prototype.removeButton = function (pageTitle) {
-        if (this.replayButton) {
-            this.gameui.removeTooltip(this.replayButton.id);
-            dojo.destroy(this.replayButton);
-            this.replayButton = null;
+    RecapHandler.prototype.createButton = function (pageTitle, id, label, icon, onClick) {
+        var _this = this;
+        if (getComputedStyle(pageTitle).position == 'static') {
+            pageTitle.style.position = 'relative';
+            this.pageTitlePositioned = true;
         }
+        var button = dojo.create('div', { id: id, class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa ' + icon + '"></i>' });
+        dojo.place(button, pageTitle, 'first');
+        this.gameui.addTooltipHtml(id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
+        var click = function () {
+            if (_this.gameui.tooltips[id]) //the button hides under the cursor, so its tooltip wouldn't get a mouseleave
+                _this.gameui.tooltips[id].close();
+            onClick();
+        };
+        dojo.connect(button, 'onclick', click);
+        dojo.connect(button, 'onkeydown', function (event) {
+            if (event.key != 'Enter' && event.key != ' ')
+                return;
+            event.preventDefault();
+            click();
+        });
+        return button;
+    };
+    RecapHandler.prototype.removeButtons = function (pageTitle) {
+        for (var _i = 0, _a = [this.replayButton, this.skipButton]; _i < _a.length; _i++) {
+            var button = _a[_i];
+            if (!button)
+                continue;
+            this.gameui.removeTooltip(button.id);
+            dojo.destroy(button);
+        }
+        this.replayButton = null;
+        this.skipButton = null;
         dojo.removeClass(pageTitle, 'replay-round-button-visible');
         if (this.pageTitlePositioned) {
             pageTitle.style.position = '';
             this.pageTitlePositioned = false;
         }
+    };
+    RecapHandler.prototype.skip = function () {
+        if (this.finishCurrentRecap) {
+            this.finishCurrentRecap('skipped');
+            return;
+        }
+        if (!this.playing)
+            return;
+        clearTimeout(this.pendingAutoplay); //skipped before the autoplay drew anything
+        this.pendingAutoplay = null;
+        if (this.recapData) {
+            this.setSeenMarker(this.recapData.round, this.recapData.steps.length);
+            console.log('Round recap: skipped before it started', { round: this.recapData.round, steps: this.recapData.steps.length });
+        }
+        this.endPlaying();
+    };
+    RecapHandler.prototype.endPlaying = function () {
+        this.setPlaying(false);
+        var deferredNotifs = this.deferredNotifs;
+        this.deferredNotifs = [];
+        deferredNotifs.forEach(function (callback) { callback(); });
     };
     RecapHandler.prototype.isLiveGameEnded = function () { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); }; //archive/replay mode keeps the recap at gameEnd
     //how many steps autoplay starts after: null replays the reveal too, undefined means no autoplay
@@ -1591,35 +1665,37 @@ var RecapHandler = /** @class */ (function () {
         }
         var finished = false;
         var watchdog = null;
-        var finish = function (failed) {
+        var animationScope = new AnimationScope();
+        var finish = function (outcome) {
             if (finished)
                 return;
             finished = true;
             clearTimeout(watchdog);
+            animationScope.stop(); //nothing of the recap keeps animating or fires later, the restore redraws whatever it left midway
+            _this.gameui.pileHandler.animationScope = null;
             _this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
-            if (isAutoplay) //set even after a failure so a broken recap doesn't autoplay on every load
+            if (isAutoplay || outcome == 'skipped') //set even after a failure so a broken recap doesn't autoplay on every load
                 _this.setSeenMarker(recap.round, recap.steps.length);
-            if (failed)
+            if (outcome == 'failed')
                 console.error('Round recap failed, showing current state');
+            else if (outcome == 'skipped')
+                console.log('Round recap: skipped', { round: recap.round, steps: recap.steps.length });
             _this.finishCurrentRecap = null;
-            _this.setPlaying(false);
-            var deferredNotifs = _this.deferredNotifs;
-            _this.deferredNotifs = [];
-            deferredNotifs.forEach(function (callback) { callback(); });
+            _this.endPlaying();
         };
         this.finishCurrentRecap = finish;
         var runAnimation = function (animate, next) {
             if (finished)
                 return;
             clearTimeout(watchdog);
-            watchdog = setTimeout(function () { finish(true); }, _this.stepTimeout);
+            watchdog = setTimeout(function () { finish('failed'); }, _this.stepTimeout);
             var isDone = false;
             var done = function () {
                 if (isDone || finished)
                     return;
                 isDone = true;
                 clearTimeout(watchdog);
-                setTimeout(function () { if (!finished)
+                animationScope.setTimeout(function () { if (!finished)
                     next(); }, _this.stepGap);
             };
             try {
@@ -1627,12 +1703,12 @@ var RecapHandler = /** @class */ (function () {
             }
             catch (e) {
                 console.error(e);
-                finish(true);
+                finish('failed');
             }
         };
         var runStep = function (stepIndex) {
             if (stepIndex >= recap.steps.length) {
-                finish(false);
+                finish('done');
                 return;
             }
             var step = recap.steps[stepIndex];
@@ -1648,6 +1724,7 @@ var RecapHandler = /** @class */ (function () {
             }, function () { runStep(stepIndex + 1); });
         };
         try {
+            this.gameui.pileHandler.animationScope = animationScope;
             this.setPlaying(true);
             for (var playerID in scoreAfterSteps) {
                 if (this.gameui.scoreCtrl[playerID])
@@ -1661,13 +1738,13 @@ var RecapHandler = /** @class */ (function () {
             else { //the board as it was after the last seen step, the revealed cards already in the queue
                 var board = this.getBoardAfterSteps(recap, seenSteps);
                 this.gameui.pileHandler.renderState(board.pilesData, board.pileQueueData);
-                setTimeout(function () { if (!finished)
+                animationScope.setTimeout(function () { if (!finished)
                     runStep(firstStep); }, this.stepGap);
             }
         }
         catch (e) {
             console.error(e);
-            finish(true);
+            finish('failed');
         }
     };
     RecapHandler.prototype.restoreCurrentState = function (currentState, currentQueueLayout, currentScores) {
