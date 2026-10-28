@@ -105,7 +105,7 @@ class GameBody extends GameGui {
                 break;
 
             case 'gameEnd':
-                this.recapHandler.ensureButton(); //removes the replay button
+                this.recapHandler.ensureButton(); //BGA rewrites the status bar for the end of game, the replay button stays for the final round
                 break;
         }
     }

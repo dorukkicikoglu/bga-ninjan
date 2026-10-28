@@ -283,7 +283,7 @@ var GameBody = /** @class */ (function (_super) {
                 this.pileHandler.showPossiblePiles(args.args.possible_piles);
                 break;
             case 'gameEnd':
-                this.recapHandler.ensureButton(); //removes the replay button
+                this.recapHandler.ensureButton(); //BGA rewrites the status bar for the end of game, the replay button stays for the final round
                 break;
         }
     };
@@ -1461,7 +1461,6 @@ var RecapHandler = /** @class */ (function () {
         this.deferredNotifs = [];
         this.replayButton = null;
         this.skipButton = null;
-        this.pageTitlePositioned = false;
         this.pendingSeenRecap = null; //live notification that arrived while the tab was hidden
         this.ensureButton();
         document.addEventListener('visibilitychange', function () { _this.onVisibilityChange(); });
@@ -1527,25 +1526,19 @@ var RecapHandler = /** @class */ (function () {
         var pageTitle = $('page-title');
         if (!pageTitle)
             return;
-        if (this.isLiveGameEnded() && !this.playing) { //no recap once the game has ended, a running replay keeps its skip button until it restored the final board
-            this.removeButtons(pageTitle);
-            return;
-        }
         if (!this.replayButton || !pageTitle.contains(this.replayButton))
             this.replayButton = this.createButton(pageTitle, 'ninjan-replay-button', _('Replay last round'), 'fa-history', function () { _this.play(false, null); });
         if (!this.skipButton || !pageTitle.contains(this.skipButton))
             this.skipButton = this.createButton(pageTitle, 'ninjan-skip-recap-button', _('Skip recap'), 'fa-step-forward', function () { _this.skip(); });
-        var isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification && !this.isLiveGameEnded();
+        var isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification; //at gameEnd too, for the final round
         this.replayButton.style.display = isReplayVisible ? '' : 'none';
         this.skipButton.style.display = this.playing ? '' : 'none';
         dojo.toggleClass(pageTitle, 'replay-round-button-visible', isReplayVisible || this.playing);
     };
     RecapHandler.prototype.createButton = function (pageTitle, id, label, icon, onClick) {
         var _this = this;
-        if (getComputedStyle(pageTitle).position == 'static') {
+        if (getComputedStyle(pageTitle).position == 'static')
             pageTitle.style.position = 'relative';
-            this.pageTitlePositioned = true;
-        }
         var button = dojo.create('div', { id: id, class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa ' + icon + '"></i>' });
         dojo.place(button, pageTitle, 'first');
         this.gameui.addTooltipHtml(id, '<div class="tooltip-wrapper replay-round-tooltip">' + label + '</div>', this.gameui.isDesktop() ? 400 : 0);
@@ -1562,22 +1555,6 @@ var RecapHandler = /** @class */ (function () {
             click();
         });
         return button;
-    };
-    RecapHandler.prototype.removeButtons = function (pageTitle) {
-        for (var _i = 0, _a = [this.replayButton, this.skipButton]; _i < _a.length; _i++) {
-            var button = _a[_i];
-            if (!button)
-                continue;
-            this.gameui.removeTooltip(button.id);
-            dojo.destroy(button);
-        }
-        this.replayButton = null;
-        this.skipButton = null;
-        dojo.removeClass(pageTitle, 'replay-round-button-visible');
-        if (this.pageTitlePositioned) {
-            pageTitle.style.position = '';
-            this.pageTitlePositioned = false;
-        }
     };
     RecapHandler.prototype.skip = function () {
         if (this.finishCurrentRecap) {
@@ -1600,7 +1577,7 @@ var RecapHandler = /** @class */ (function () {
         this.deferredNotifs = [];
         deferredNotifs.forEach(function (callback) { callback(); });
     };
-    RecapHandler.prototype.isLiveGameEnded = function () { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); }; //archive/replay mode keeps the recap at gameEnd
+    RecapHandler.prototype.isLiveGameEnded = function () { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); }; //no autoplay then, archive/replay mode never autoplays anyway
     //how many steps autoplay starts after: null replays the reveal too, undefined means no autoplay
     RecapHandler.prototype.getAutoplaySeenSteps = function (autoplayEligible) {
         if (!autoplayEligible || !this.recapData || !this.gameui.myself || this.gameui.isSpectator || this.isLiveGameEnded() || this.gameui.isReplay() || this.gameui.instantaneousMode) {
@@ -1646,12 +1623,13 @@ var RecapHandler = /** @class */ (function () {
     };
     RecapHandler.prototype.play = function (isAutoplay, seenSteps) {
         var _this = this;
-        if (!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification || (!isAutoplay && this.isLiveGameEnded()))
+        if (!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification)
             return;
         var recap = JSON.parse(JSON.stringify(this.recapData));
         var firstStep = seenSteps === null ? 0 : seenSteps;
         var currentState = this.gameui.pileHandler.getStateSnapshot();
         var currentQueueLayout = this.gameui.pileHandler.getQueueLayoutSnapshot();
+        var endOfGameTitle = this.gameui.gamedatas.gamestate.name == 'gameEnd' ? { status: $('gameaction_status').innerHTML, title: $('pagemaintitletext').innerHTML } : null; //BGA adds the end of game title and buttons once, updatePageTitle can't rebuild them
         var currentScores = {};
         var scoreAfterSteps = {};
         for (var playerID in this.gameui.players) {
@@ -1673,7 +1651,7 @@ var RecapHandler = /** @class */ (function () {
             clearTimeout(watchdog);
             animationScope.stop(); //nothing of the recap keeps animating or fires later, the restore redraws whatever it left midway
             _this.gameui.pileHandler.animationScope = null;
-            _this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
+            _this.restoreCurrentState(currentState, currentQueueLayout, currentScores, endOfGameTitle);
             if (isAutoplay || outcome == 'skipped') //set even after a failure so a broken recap doesn't autoplay on every load
                 _this.setSeenMarker(recap.round, recap.steps.length);
             if (outcome == 'failed')
@@ -1747,21 +1725,26 @@ var RecapHandler = /** @class */ (function () {
             finish('failed');
         }
     };
-    RecapHandler.prototype.restoreCurrentState = function (currentState, currentQueueLayout, currentScores) {
+    RecapHandler.prototype.restoreCurrentState = function (currentState, currentQueueLayout, currentScores, endOfGameTitle) {
         try {
             this.gameui.pileHandler.renderState(currentState.pilesData, currentState.pileQueueData);
             var gamestate = this.gameui.gamedatas.gamestate;
-            if (this.isLiveGameEnded()) { //game ended during the replay, leave the queue exactly as the live game left it
+            if (this.isLiveGameEnded() && !endOfGameTitle) { //game ended during the replay, leave the queue exactly as the live game left it
                 this.gameui.pileHandler.applyQueueLayoutSnapshot(currentQueueLayout);
                 this.gameui.pileHandler.onLeavingStateTakePiles(); //in case the replay started before takePile was left
             }
-            else if (gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd
+            else if (gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd. a replay started at gameEnd ends on this too, its last step already fitted the queue
                 this.gameui.pileHandler.pileQueueContainer.style.display = 'inline-block';
             for (var playerID in currentScores) {
                 if (this.gameui.scoreCtrl[playerID])
                     this.gameui.scoreCtrl[playerID].setValue(currentScores[playerID]);
             }
-            this.gameui.updatePageTitle();
+            if (endOfGameTitle) { //updatePageTitle would also empty the Return to main site / Play again buttons
+                $('gameaction_status').innerHTML = endOfGameTitle.status;
+                $('pagemaintitletext').innerHTML = endOfGameTitle.title;
+            }
+            else
+                this.gameui.updatePageTitle();
             if (gamestate.name == 'takePile' && gamestate.args && gamestate.args.possible_piles)
                 this.gameui.pileHandler.showPossiblePiles(gamestate.args.possible_piles);
             this.gameui.tooltipHandler.addTooltipToCards();

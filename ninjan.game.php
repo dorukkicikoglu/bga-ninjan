@@ -425,12 +425,8 @@ class Ninjan extends Table
         $result['pref_names'] = $this->globalsManager->userPrefs;
 
         $stateName = $this->gamestate->getCurrentMainState()->name;
-        if($stateName == 'gameEnd') //no recap once the game has ended
-            $result['recapAutoplayEligible'] = false;
-        else {
-            $result['lastRoundRecap'] = $this->getRoundRecap();
-            $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && (($stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id)) || $stateName == 'takePile'); //takePile: every player, active or not
-        }
+        $result['lastRoundRecap'] = $this->getRoundRecap(); //at gameEnd too, the final round can still be replayed manually
+        $result['recapAutoplayEligible'] = $result['lastRoundRecap'] !== null && !$this->isSpectator() && (($stateName == 'selectCard' && $this->gamestate->isPlayerActive($current_player_id)) || $stateName == 'takePile'); //takePile: every player, active or not. never at gameEnd
 
         return $result;
     }

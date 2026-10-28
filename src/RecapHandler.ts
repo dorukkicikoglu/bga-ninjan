@@ -12,7 +12,6 @@ class RecapHandler{
     private deferredNotifs: (() => void)[] = [];
     private replayButton: HTMLDivElement = null;
     private skipButton: HTMLDivElement = null;
-    private pageTitlePositioned: boolean = false;
     private pendingSeenRecap: RoundRecap | null = null; //live notification that arrived while the tab was hidden
 
     constructor(private gameui: GameBody, private recapData: RoundRecap | null, autoplayEligible: boolean) {
@@ -96,27 +95,20 @@ class RecapHandler{
         if(!pageTitle)
             return;
 
-        if(this.isLiveGameEnded() && !this.playing){ //no recap once the game has ended, a running replay keeps its skip button until it restored the final board
-            this.removeButtons(pageTitle);
-            return;
-        }
-
         if(!this.replayButton || !pageTitle.contains(this.replayButton))
             this.replayButton = this.createButton(pageTitle, 'ninjan-replay-button', _('Replay last round'), 'fa-history', () => { this.play(false, null); });
         if(!this.skipButton || !pageTitle.contains(this.skipButton))
             this.skipButton = this.createButton(pageTitle, 'ninjan-skip-recap-button', _('Skip recap'), 'fa-step-forward', () => { this.skip(); });
 
-        const isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification && !this.isLiveGameEnded();
+        const isReplayVisible = !!this.recapData && !this.playing && !this.gameui.isAnimatingNotification; //at gameEnd too, for the final round
         this.replayButton.style.display = isReplayVisible ? '' : 'none';
         this.skipButton.style.display = this.playing ? '' : 'none';
         dojo.toggleClass(pageTitle, 'replay-round-button-visible', isReplayVisible || this.playing);
     }
 
     private createButton(pageTitle: HTMLDivElement, id: string, label: string, icon: string, onClick: () => void): HTMLDivElement { //both buttons share the spot at the left of the status bar
-        if(getComputedStyle(pageTitle).position == 'static'){
+        if(getComputedStyle(pageTitle).position == 'static')
             pageTitle.style.position = 'relative';
-            this.pageTitlePositioned = true;
-        }
 
         const button: HTMLDivElement = dojo.create('div', {id: id, class: 'replay-round-button', role: 'button', tabindex: 0, title: label, 'aria-label': label, innerHTML: '<i class="fa ' + icon + '"></i>'});
         dojo.place(button, pageTitle, 'first');
@@ -136,23 +128,6 @@ class RecapHandler{
         });
 
         return button;
-    }
-
-    private removeButtons(pageTitle: HTMLDivElement): void {
-        for(const button of [this.replayButton, this.skipButton]){
-            if(!button)
-                continue;
-            this.gameui.removeTooltip(button.id);
-            dojo.destroy(button);
-        }
-        this.replayButton = null;
-        this.skipButton = null;
-
-        dojo.removeClass(pageTitle, 'replay-round-button-visible');
-        if(this.pageTitlePositioned){
-            pageTitle.style.position = '';
-            this.pageTitlePositioned = false;
-        }
     }
 
     private skip(): void { //jumps to the current game position and counts the recap as seen
@@ -181,7 +156,7 @@ class RecapHandler{
         deferredNotifs.forEach((callback) => { callback(); });
     }
 
-    private isLiveGameEnded(): boolean { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); } //archive/replay mode keeps the recap at gameEnd
+    private isLiveGameEnded(): boolean { return this.gameui.gamedatas.gamestate.name == 'gameEnd' && !this.gameui.isReplay(); } //no autoplay then, archive/replay mode never autoplays anyway
 
     //how many steps autoplay starts after: null replays the reveal too, undefined means no autoplay
     private getAutoplaySeenSteps(autoplayEligible: boolean): number | null | undefined {
@@ -233,13 +208,14 @@ class RecapHandler{
     }
 
     private play(isAutoplay: boolean, seenSteps: number | null): void { //seenSteps: start on the board after that many steps, null replays from the reveal
-        if(!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification || (!isAutoplay && this.isLiveGameEnded()))
+        if(!this.recapData || (this.playing && !isAutoplay) || this.finishCurrentRecap || this.gameui.isAnimatingNotification)
             return;
 
         const recap: RoundRecap = JSON.parse(JSON.stringify(this.recapData));
         const firstStep = seenSteps === null ? 0 : seenSteps;
         const currentState = this.gameui.pileHandler.getStateSnapshot();
         const currentQueueLayout = this.gameui.pileHandler.getQueueLayoutSnapshot();
+        const endOfGameTitle = this.gameui.gamedatas.gamestate.name == 'gameEnd' ? {status: $('gameaction_status').innerHTML, title: $('pagemaintitletext').innerHTML} : null; //BGA adds the end of game title and buttons once, updatePageTitle can't rebuild them
         const currentScores: Record<number, number> = {};
         const scoreAfterSteps: Record<number, number> = {};
 
@@ -265,7 +241,7 @@ class RecapHandler{
             animationScope.stop(); //nothing of the recap keeps animating or fires later, the restore redraws whatever it left midway
             this.gameui.pileHandler.animationScope = null;
 
-            this.restoreCurrentState(currentState, currentQueueLayout, currentScores);
+            this.restoreCurrentState(currentState, currentQueueLayout, currentScores, endOfGameTitle);
 
             if(isAutoplay || outcome == 'skipped') //set even after a failure so a broken recap doesn't autoplay on every load
                 this.setSeenMarker(recap.round, recap.steps.length);
@@ -350,15 +326,15 @@ class RecapHandler{
         }
     }
 
-    private restoreCurrentState(currentState: { pilesData: CardData[][], pileQueueData: CardData[] }, currentQueueLayout: QueueLayout, currentScores: Record<number, number>): void {
+    private restoreCurrentState(currentState: { pilesData: CardData[][], pileQueueData: CardData[] }, currentQueueLayout: QueueLayout, currentScores: Record<number, number>, endOfGameTitle: { status: string, title: string } | null): void { //endOfGameTitle: the replay started at gameEnd
         try {
             this.gameui.pileHandler.renderState(currentState.pilesData, currentState.pileQueueData);
 
             const gamestate = this.gameui.gamedatas.gamestate;
-            if(this.isLiveGameEnded()){ //game ended during the replay, leave the queue exactly as the live game left it
+            if(this.isLiveGameEnded() && !endOfGameTitle){ //game ended during the replay, leave the queue exactly as the live game left it
                 this.gameui.pileHandler.applyQueueLayoutSnapshot(currentQueueLayout);
                 this.gameui.pileHandler.onLeavingStateTakePiles(); //in case the replay started before takePile was left
-            } else if(gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd
+            } else if(gamestate.name == 'gameEnd' && currentState.pileQueueData.length > 0) //same as setup, queue stays visible at gameEnd. a replay started at gameEnd ends on this too, its last step already fitted the queue
                 this.gameui.pileHandler.pileQueueContainer.style.display = 'inline-block';
 
             for(let playerID in currentScores){
@@ -366,7 +342,11 @@ class RecapHandler{
                     this.gameui.scoreCtrl[playerID].setValue(currentScores[playerID]);
             }
 
-            this.gameui.updatePageTitle();
+            if(endOfGameTitle){ //updatePageTitle would also empty the Return to main site / Play again buttons
+                $('gameaction_status').innerHTML = endOfGameTitle.status;
+                $('pagemaintitletext').innerHTML = endOfGameTitle.title;
+            } else
+                this.gameui.updatePageTitle();
 
             if(gamestate.name == 'takePile' && gamestate.args && gamestate.args.possible_piles)
                 this.gameui.pileHandler.showPossiblePiles(gamestate.args.possible_piles);
