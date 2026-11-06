@@ -367,8 +367,10 @@ var GameBody = /** @class */ (function (_super) {
         this.recapHandler.setRecapData(notif.args.round_recap);
         if (notif.args.round_recap)
             this.recapHandler.markSeenLive(notif.args.round_recap);
-        if (parseInt(notif.args.new_score) == notif.args.new_score)
+        if (parseInt(notif.args.new_score) == notif.args.new_score) {
+            this.gamedatas.players[notif.args.player_id].score = notif.args.new_score; //the recap reads the real scores from here
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
+        }
         this.hideRefCard();
         this.pileHandler.animatePileTaken(notif.args.player_id, notif.args.pile_index, notif.args.selected_card_data, notif.args.reason, notif.args.autoPlay, notif.args.card_icons_data || []);
     };
@@ -1448,6 +1450,17 @@ var PrefHandler = /** @class */ (function () {
     };
     return PrefHandler;
 }());
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var RecapHandler = /** @class */ (function () {
     function RecapHandler(gameui, recapData, autoplayEligible) {
         var _this = this;
@@ -1633,14 +1646,15 @@ var RecapHandler = /** @class */ (function () {
         var currentScores = {};
         var scoreAfterSteps = {};
         for (var playerID in this.gameui.players) {
-            currentScores[playerID] = this.gameui.scoreCtrl[playerID] ? this.gameui.scoreCtrl[playerID].getValue() : 0;
+            currentScores[playerID] = Number(this.gameui.gamedatas.players[playerID].score);
             scoreAfterSteps[playerID] = currentScores[playerID];
         }
-        for (var _i = 0, _a = recap.steps.slice(firstStep); _i < _a.length; _i++) { //derive scores before the replayed steps from the current scores
+        for (var _i = 0, _a = recap.steps.slice(firstStep); _i < _a.length; _i++) { //derive scores before the replayed steps from the current scores, only a take changes a score
             var step = _a[_i];
             if (step.action == 'take' && scoreAfterSteps.hasOwnProperty(step.player_id))
                 scoreAfterSteps[step.player_id] -= step.taken_cards.reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
         }
+        console.log('Round recap scores', { current: __assign({}, currentScores), atStart: __assign({}, scoreAfterSteps), firstStep: firstStep + 1 });
         var finished = false;
         var watchdog = null;
         var animationScope = new AnimationScope();
@@ -1696,6 +1710,7 @@ var RecapHandler = /** @class */ (function () {
             runAnimation(function (done) {
                 if (step.action == 'take' && _this.gameui.scoreCtrl[step.player_id]) {
                     scoreAfterSteps[step.player_id] += step.taken_cards.reduce(function (sum, cardData) { return sum + Number(cardData.rank); }, 0);
+                    console.log('Round recap score', { player: step.player_id, to: scoreAfterSteps[step.player_id] });
                     _this.gameui.scoreCtrl[step.player_id].toValue(scoreAfterSteps[step.player_id]);
                 }
                 _this.gameui.pileHandler.animatePileTaken(step.player_id, pileIndex, step.card, reason, step.auto, cardIconsData, done);

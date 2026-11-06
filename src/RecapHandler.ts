@@ -220,14 +220,15 @@ class RecapHandler{
         const scoreAfterSteps: Record<number, number> = {};
 
         for(let playerID in this.gameui.players){
-            currentScores[playerID] = this.gameui.scoreCtrl[playerID] ? this.gameui.scoreCtrl[playerID].getValue() : 0;
+            currentScores[playerID] = Number(this.gameui.gamedatas.players[playerID].score);
             scoreAfterSteps[playerID] = currentScores[playerID];
         }
 
-        for(let step of recap.steps.slice(firstStep)){ //derive scores before the replayed steps from the current scores
+        for(let step of recap.steps.slice(firstStep)){ //derive scores before the replayed steps from the current scores, only a take changes a score
             if(step.action == 'take' && scoreAfterSteps.hasOwnProperty(step.player_id))
                 scoreAfterSteps[step.player_id] -= step.taken_cards.reduce((sum, cardData) => sum + Number(cardData.rank), 0);
         }
+        console.log('Round recap scores', {current: {...currentScores}, atStart: {...scoreAfterSteps}, firstStep: firstStep + 1});
 
         let finished = false;
         let watchdog: number = null;
@@ -294,6 +295,7 @@ class RecapHandler{
             runAnimation((done) => {
                 if(step.action == 'take' && this.gameui.scoreCtrl[step.player_id]){
                     scoreAfterSteps[step.player_id] += step.taken_cards.reduce((sum, cardData) => sum + Number(cardData.rank), 0);
+                    console.log('Round recap score', {player: step.player_id, to: scoreAfterSteps[step.player_id]});
                     this.gameui.scoreCtrl[step.player_id].toValue(scoreAfterSteps[step.player_id]);
                 }
 

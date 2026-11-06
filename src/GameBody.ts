@@ -213,8 +213,10 @@ class GameBody extends GameGui {
         if(notif.args.round_recap)
             this.recapHandler.markSeenLive(notif.args.round_recap);
 
-        if(parseInt(notif.args.new_score) == notif.args.new_score)
+        if(parseInt(notif.args.new_score) == notif.args.new_score){
+            this.gamedatas.players[notif.args.player_id].score = notif.args.new_score; //the recap reads the real scores from here
             this.scoreCtrl[notif.args.player_id].toValue(notif.args.new_score);
+        }
 
         this.hideRefCard();
         this.pileHandler.animatePileTaken(notif.args.player_id, notif.args.pile_index, notif.args.selected_card_data, notif.args.reason, notif.args.autoPlay, notif.args.card_icons_data || [] );
