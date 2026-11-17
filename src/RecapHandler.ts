@@ -17,6 +17,7 @@ class RecapHandler{
     constructor(private gameui: GameBody, private recapData: RoundRecap | null, autoplayEligible: boolean) {
         this.ensureButton();
         document.addEventListener('visibilitychange', () => { this.onVisibilityChange(); });
+        document.addEventListener('click', () => { if(this.playing) this.skip(); }, true); //any click skips a running recap. capture phase, so the replay button's own click is over before a recap starts
         this.pruneSeenMarkers();
 
         const autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
