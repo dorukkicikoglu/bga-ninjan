@@ -1477,6 +1477,8 @@ var RecapHandler = /** @class */ (function () {
         this.pendingSeenRecap = null; //live notification that arrived while the tab was hidden
         this.ensureButton();
         document.addEventListener('visibilitychange', function () { _this.onVisibilityChange(); });
+        document.addEventListener('click', function () { if (_this.playing)
+            _this.skip(); }, true); //any click skips a running recap. capture phase, so the replay button's own click is over before a recap starts
         this.pruneSeenMarkers();
         var autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
         if (autoplaySeenSteps === undefined)
