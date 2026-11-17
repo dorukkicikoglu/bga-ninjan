@@ -13,7 +13,7 @@ class RecapHandler{
     private replayButton: HTMLDivElement = null;
     private skipButton: HTMLDivElement = null;
     private pendingSeenRecap: RoundRecap | null = null; //live notification that arrived while the tab was hidden
-private hghjggj = 33;
+
     constructor(private gameui: GameBody, private recapData: RoundRecap | null, autoplayEligible: boolean) {
         this.ensureButton();
         document.addEventListener('visibilitychange', () => { this.onVisibilityChange(); });
@@ -23,7 +23,7 @@ private hghjggj = 33;
         const autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
         if(autoplaySeenSteps === undefined)
             return;
-this.hghjggj+=22;
+
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
         this.pendingAutoplay = setTimeout(() => { this.pendingAutoplay = null; this.play(true, autoplaySeenSteps); }, 500);
     }
