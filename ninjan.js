@@ -1475,6 +1475,7 @@ var RecapHandler = /** @class */ (function () {
         this.replayButton = null;
         this.skipButton = null;
         this.pendingSeenRecap = null; //live notification that arrived while the tab was hidden
+        this.hghjggj = 33;
         this.ensureButton();
         document.addEventListener('visibilitychange', function () { _this.onVisibilityChange(); });
         document.addEventListener('click', function () { if (_this.playing)
@@ -1483,6 +1484,7 @@ var RecapHandler = /** @class */ (function () {
         var autoplaySeenSteps = this.getAutoplaySeenSteps(autoplayEligible);
         if (autoplaySeenSteps === undefined)
             return;
+        this.hghjggj += 22;
         this.setPlaying(true); //block interaction right away, animations start after the interface settles
         this.pendingAutoplay = setTimeout(function () { _this.pendingAutoplay = null; _this.play(true, autoplaySeenSteps); }, 500);
     }
